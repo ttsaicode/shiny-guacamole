@@ -1,378 +1,310 @@
-// ==================================================
-// DOM ELEMENTS
-// ==================================================
+"use strict";
+
+/*
+  ============================================================
+  HEY - WEBRTC CLIENT
+  ============================================================
+
+  This file handles:
+
+  - Camera + microphone
+  - WebSocket signaling
+  - WebRTC peer connection
+  - STUN / TURN
+  - DataChannel chat
+  - Next
+  - Report
+  - Stop / completely destroy current connection
+  ============================================================
+*/
+
+
+/* ============================================================
+   DOM ELEMENTS
+   ============================================================ */
 
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
-const startButton = document.getElementById("startButton");
-const statusText = document.getElementById("status");
 
 const localPlaceholder = document.getElementById("localPlaceholder");
 const remotePlaceholder = document.getElementById("remotePlaceholder");
 
-const chat = document.getElementById("chat");
-const chatMessages = document.getElementById("chatMessages");
-const chatForm = document.getElementById("chatForm");
-const chatInput = document.getElementById("chatInput");
-const chatToggle = document.getElementById("chatToggle");
-
-const reportButton = document.getElementById("reportButton");
+const startButton = document.getElementById("startButton");
+const stopButton = document.getElementById("stopButton");
 const nextButton = document.getElementById("nextButton");
 
-const reportModal = document.getElementById("reportModal");
-const cancelReportButton = document.getElementById("cancelReport");
-const submitReportButton = document.getElementById("submitReport");
+const chatToggleButton = document.getElementById("chatToggleButton");
+const reportButton = document.getElementById("reportButton");
 
-// ==================================================
-// VARIABLES
-// ==================================================
+const statusElement = document.getElementById("status");
 
-let localStream = null;
-let peerConnection = null;
-let socket = null;
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
+const chatMessages = document.getElementById("chatMessages");
+const sendChatButton = document.getElementById("sendChatButton");
 
-let pendingIceCandidates = [];
-let hasStartedCamera = false;
-let isMatched = false;
+const reportModalBackdrop =
+  document.getElementById("reportModalBackdrop");
 
-let chatChannel = null;
-let chatEnabled = true;
+const cancelReportButton =
+  document.getElementById("cancelReportButton");
 
-// ==================================================
-// WEBRTC CONFIGURATION
-// ==================================================
+const submitReportButton =
+  document.getElementById("submitReportButton");
+
+
+/* ============================================================
+   WEBRTC CONFIGURATION
+   ============================================================ */
 
 const rtcConfiguration = {
   iceServers: [
     {
-      urls: [
-        "stun:free.expressturn.com:3478"
-      ]
+      urls:"stun:free.expressturn.com:3478"
     },
+
     {
       urls: [
         "turn:free.expressturn.com:3478?transport=udp",
         "turn:free.expressturn.com:3478?transport=tcp"
       ],
-        urls: 'turn:free.expressturn.com:3478',
+
+      
+
+         urls: 'turn:free.expressturn.com:3478',
         username: "000000002103732653",
         credential: "rgTyOIK/8pVvQzdnm7e5jave1MA="
     }
   ],
 
-  // "all" lets WebRTC try direct/STUN paths first
-  // and use TURN when a relay is needed.
-  iceTransportPolicy: "all",
+  /*
+    "all" allows the browser to use:
 
-  iceCandidatePoolSize: 10
+    - host candidates
+    - STUN candidates
+    - TURN relay candidates
+
+    This is what we want for normal operation.
+  */
+
+  iceTransportPolicy: "all"
 };
 
-// ==================================================
-// DEBUG LOGGING
-// ==================================================
 
-function debug(title, data = "") {
-  const time = new Date().toLocaleTimeString();
+/* ============================================================
+   STATE
+   ============================================================ */
 
-  console.log(
-    `%c[${time}] ${title}`,
-    "font-weight: bold; color: #00ff88;",
-    data
-  );
+let localStream = null;
+
+let peerConnection = null;
+
+let socket = null;
+
+let chatChannel = null;
+
+let pendingIceCandidates = [];
+
+let hasStartedCamera = false;
+
+let isMatched = false;
+
+let chatEnabled = true;
+
+
+/* ============================================================
+   DEBUGGING
+   ============================================================ */
+
+function debug(...args) {
+  console.log("[HEY]", ...args);
 }
 
-function debugError(title, error) {
-  console.error(`[ERROR] ${title}`, error);
-}
 
-// ==================================================
-// STATUS
-// ==================================================
+/* ============================================================
+   STATUS
+   ============================================================ */
 
 function setStatus(message) {
-  console.log("[STATUS]", message);
-  statusText.textContent = message;
+  statusElement.textContent = message;
+  debug(message);
 }
 
-// ==================================================
-// UI HELPERS
-// ==================================================
+
+/* ============================================================
+   VIDEO PLACEHOLDERS
+   ============================================================ */
 
 function updateVideoPlaceholders() {
-  localPlaceholder.style.display = localVideo.srcObject ? "none" : "flex";
-  remotePlaceholder.style.display = remoteVideo.srcObject ? "none" : "flex";
+  if (localStream) {
+    localPlaceholder.style.display = "none";
+  } else {
+    localPlaceholder.style.display = "flex";
+  }
+
+  if (remoteVideo.srcObject) {
+    remotePlaceholder.style.display = "none";
+  } else {
+    remotePlaceholder.style.display = "flex";
+  }
 }
+
+
+/* ============================================================
+   BUTTON STATE
+   ============================================================ */
 
 function updateMatchButtons() {
-  reportButton.disabled = !isMatched;
   nextButton.disabled = !isMatched;
-}
+  reportButton.disabled = !isMatched;
 
-function clearChat() {
-  chatMessages.innerHTML = "";
-}
+  chatToggleButton.disabled = !isMatched;
 
-function addChatMessage(sender, text) {
-  const messageElement = document.createElement("div");
-
-  messageElement.className =
-    `chat-message ${sender === "You" ? "you" : "stranger"}`;
-
-  const senderElement = document.createElement("span");
-  senderElement.className = "sender";
-  senderElement.textContent = `${sender}:`;
-
-  const textElement = document.createElement("span");
-  textElement.textContent = text;
-
-  messageElement.appendChild(senderElement);
-  messageElement.appendChild(textElement);
-
-  chatMessages.appendChild(messageElement);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function updateChatUI() {
-  chat.style.display = chatEnabled ? "flex" : "none";
-  chatToggle.textContent = chatEnabled
-    ? "💬 Chat: ON"
-    : "💬 Chat: OFF";
-}
-
-function setChatInputEnabled(enabled) {
-  chatInput.disabled = !enabled;
-}
-
-function closeChatChannel() {
-  if (chatChannel) {
-    try {
-      chatChannel.close();
-    } catch (error) {
-      debugError("Failed to close chat channel", error);
-    }
-  }
-
-  chatChannel = null;
-  setChatInputEnabled(false);
-}
-
-// ==================================================
-// CHAT DATA CHANNEL
-// ==================================================
-
-function setupChatChannel(channel) {
-  closeChatChannel();
-
-  chatChannel = channel;
-
-  chatChannel.addEventListener("open", () => {
-    debug("Chat data channel opened.");
-    setChatInputEnabled(true);
-  });
-
-  chatChannel.addEventListener("message", (event) => {
-    try {
-      const data = JSON.parse(event.data);
-
-      if (data.type === "chat" && typeof data.text === "string") {
-        addChatMessage("Stranger", data.text);
-      }
-    } catch (error) {
-      debugError("Could not process chat message", error);
-    }
-  });
-
-  chatChannel.addEventListener("close", () => {
-    debug("Chat data channel closed.");
-    setChatInputEnabled(false);
-  });
-
-  chatChannel.addEventListener("error", (error) => {
-    debugError("Chat data channel error", error);
-  });
-
-  if (chatChannel.readyState === "open") {
-    setChatInputEnabled(true);
+  if (isMatched) {
+    chatToggleButton.textContent = chatEnabled
+      ? "💬 Chat: ON"
+      : "💬 Chat: OFF";
   }
 }
 
-// ==================================================
-// SEND CHAT MESSAGE
-// ==================================================
 
-function sendChatMessage(text) {
-  const cleanText = text.trim();
+function updateStopButton() {
+  stopButton.disabled = !hasStartedCamera;
+}
 
-  if (!cleanText || !chatChannel) {
+
+/* ============================================================
+   WEBSOCKET CONNECTION
+   ============================================================ */
+
+function connectToSignalingServer() {
+  if (
+    socket &&
+    (
+      socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CONNECTING
+    )
+  ) {
     return;
   }
 
-  if (chatChannel.readyState !== "open") {
-    setStatus("Chat is not ready yet.");
-    return;
-  }
-
-  const message = {
-    type: "chat",
-    text: cleanText
-  };
-
-  try {
-    chatChannel.send(JSON.stringify(message));
-    addChatMessage("You", cleanText);
-  } catch (error) {
-    debugError("Failed to send chat message", error);
-  }
-}
-
-// ==================================================
-// SEND SIGNALING MESSAGE
-// ==================================================
-
-function sendMessage(message) {
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    debug(
-      "Cannot send signaling message. Socket is not open.",
-      message
-    );
-    return;
-  }
-
-  debug("Sending signaling message", message.type);
-  socket.send(JSON.stringify(message));
-}
-
-// ==================================================
-// CONNECT TO SIGNALING SERVER
-// ==================================================
-
-function connectSignaling() {
   const protocol =
-    window.location.protocol === "https:" ? "wss:" : "ws:";
+    window.location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
 
   const socketUrl =
     `${protocol}//${window.location.host}`;
 
-  debug("Connecting to signaling server", socketUrl);
+  debug("Connecting to signaling server:", socketUrl);
 
   socket = new WebSocket(socketUrl);
 
   socket.addEventListener("open", () => {
-    debug("WebSocket connected successfully");
-    setStatus("Connected. Click Start Camera.");
+    debug("Connected to signaling server");
+
+    if (hasStartedCamera) {
+      setStatus("Connected. Looking for someone...");
+    }
   });
 
   socket.addEventListener("message", async (event) => {
     try {
       const message = JSON.parse(event.data);
 
-      debug(
-        "Received signaling message",
-        message.type
-      );
+      debug("Received signaling message:", message.type);
 
-      switch (message.type) {
-        case "waiting":
-          isMatched = false;
-          updateMatchButtons();
-          setStatus("Waiting for another person...");
-          break;
-
-        case "matched":
-          isMatched = true;
-          updateMatchButtons();
-
-          clearChat();
-
-          debug(
-            "Matched with another browser",
-            message
-          );
-
-          setStatus("Partner found. Connecting...");
-          break;
-
-        case "create-offer":
-          debug(
-            "Server asked us to create an offer."
-          );
-
-          await createOffer();
-          break;
-
-        case "offer":
-          await handleOffer(message);
-          break;
-
-        case "answer":
-          await handleAnswer(message);
-          break;
-
-        case "ice-candidate":
-          await handleIceCandidate(message);
-          break;
-
-        case "peer-disconnected":
-          handlePeerDisconnected();
-          break;
-
-        default:
-          debug(
-            "Unknown signaling message",
-            message
-          );
-      }
+      await handleSignalingMessage(message);
 
     } catch (error) {
-      debugError(
-        "Error processing signaling message",
+      console.error(
+        "[HEY] Error handling server message:",
         error
       );
     }
   });
 
-  socket.addEventListener("error", (error) => {
-    debugError("WebSocket error", error);
-    setStatus("Signaling connection error.");
+  socket.addEventListener("close", (event) => {
+    debug(
+      "Signaling server connection closed.",
+      {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+      }
+    );
+
+    socket = null;
+
+    /*
+      The browser can reconnect later when Start Camera
+      is clicked again.
+    */
+
+    if (hasStartedCamera) {
+      setStatus(
+        "Signaling server disconnected. Please try again."
+      );
+    }
   });
 
-  socket.addEventListener("close", (event) => {
-    debug("WebSocket CLOSED", {
-      code: event.code,
-      reason: event.reason,
-      wasClean: event.wasClean
-    });
-
-    setStatus(
-      "Signaling server disconnected."
+  socket.addEventListener("error", (error) => {
+    console.error(
+      "[HEY] WebSocket error:",
+      error
     );
   });
 }
 
-// ==================================================
-// START CAMERA
-// ==================================================
+
+/* ============================================================
+   SEND WEBSOCKET MESSAGE
+   ============================================================ */
+
+function sendMessage(message) {
+  if (
+    socket &&
+    socket.readyState === WebSocket.OPEN
+  ) {
+    debug("Sending:", message.type);
+
+    socket.send(JSON.stringify(message));
+
+    return true;
+  }
+
+  debug(
+    "Could not send message. WebSocket not open:",
+    message.type
+  );
+
+  return false;
+}
+
+
+/* ============================================================
+   START CAMERA
+   ============================================================ */
 
 async function startCamera() {
   if (hasStartedCamera) {
-    debug("Camera already started.");
     return;
   }
 
   try {
-    debug(
-      "Requesting camera and microphone..."
-    );
+    setStatus("Requesting camera and microphone...");
 
-    localStream =
+    /*
+      Ask the browser for camera + microphone.
+    */
+
+    const stream =
       await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
 
-    debug(
-      "Camera and microphone obtained."
-    );
+    localStream = stream;
 
     localVideo.srcObject = localStream;
 
@@ -380,107 +312,137 @@ async function startCamera() {
 
     startButton.disabled = true;
 
+    updateStopButton();
     updateVideoPlaceholders();
 
-    await createPeerConnection();
+    debug("Camera and microphone obtained.");
 
-    setStatus(
-      "Ready. Finding another person..."
-    );
+    /*
+      Make sure signaling is connected.
+    */
 
-    sendMessage({
-      type: "ready"
-    });
+    connectToSignalingServer();
+
+    /*
+      If the socket is already connected, tell the
+      server that this browser is ready to match.
+    */
+
+    if (
+      socket &&
+      socket.readyState === WebSocket.OPEN
+    ) {
+      createPeerConnection();
+
+      sendMessage({
+        type: "ready"
+      });
+
+      setStatus("Looking for someone...");
+    } else {
+      setStatus("Connecting to server...");
+
+      /*
+        The socket open handler doesn't automatically create
+        the peer connection if the connection wasn't ready yet.
+      */
+
+      const waitForSocket = setInterval(() => {
+        if (!hasStartedCamera) {
+          clearInterval(waitForSocket);
+          return;
+        }
+
+        if (
+          socket &&
+          socket.readyState === WebSocket.OPEN
+        ) {
+          clearInterval(waitForSocket);
+
+          createPeerConnection();
+
+          sendMessage({
+            type: "ready"
+          });
+
+          setStatus("Looking for someone...");
+        }
+      }, 100);
+    }
 
   } catch (error) {
-    debugError(
-      "Camera/microphone error",
+    console.error(
+      "[HEY] Camera/microphone error:",
       error
     );
 
+    hasStartedCamera = false;
+
+    startButton.disabled = false;
+
+    updateStopButton();
+
     setStatus(
-      `Could not access camera/microphone: ${error.name} - ${error.message}`
+      "Could not access your camera or microphone."
+    );
+
+    alert(
+      "Please allow camera and microphone access in your browser."
     );
   }
 }
 
-// ==================================================
-// CREATE PEER CONNECTION
-// ==================================================
 
-async function createPeerConnection() {
+/* ============================================================
+   CREATE PEER CONNECTION
+   ============================================================ */
+
+function createPeerConnection() {
+  /*
+    If an old peer connection exists, close it first.
+  */
+
   if (peerConnection) {
-    debug("Closing old PeerConnection");
-
     try {
       peerConnection.close();
     } catch (error) {
-      debugError(
-        "Failed to close old PeerConnection",
+      console.warn(
+        "[HEY] Error closing old peer connection:",
         error
       );
     }
   }
 
-  closeChatChannel();
-
   pendingIceCandidates = [];
 
-  debug(
-    "Creating RTCPeerConnection",
-    rtcConfiguration
-  );
+  debug("Creating RTCPeerConnection...");
 
   peerConnection =
-    new RTCPeerConnection(
-      rtcConfiguration
-    );
+    new RTCPeerConnection(rtcConfiguration);
 
-  if (!localStream) {
-    throw new Error(
-      "No local camera/microphone stream exists."
-    );
-  }
 
-  localStream
-    .getTracks()
-    .forEach((track) => {
-      debug(
-        "Adding local track",
-        track.kind
-      );
+  /* ----------------------------------------------------------
+     ADD LOCAL TRACKS
+     ---------------------------------------------------------- */
 
+  if (localStream) {
+    localStream.getTracks().forEach((track) => {
       peerConnection.addTrack(
         track,
         localStream
       );
     });
+  }
 
-  // The callee receives the channel created by the caller.
-  peerConnection.addEventListener(
-    "datachannel",
-    (event) => {
-      debug(
-        "Remote data channel received",
-        event.channel.label
-      );
 
-      if (event.channel.label === "chat") {
-        setupChatChannel(event.channel);
-      }
-    }
-  );
+  /* ----------------------------------------------------------
+     REMOTE TRACK
+     ---------------------------------------------------------- */
 
   peerConnection.addEventListener(
     "track",
     (event) => {
-      debug(
-        "REMOTE TRACK RECEIVED",
-        {
-          kind: event.track.kind,
-          streams: event.streams.length
-        }
-      );
+      debug("Remote track received.");
 
       if (
         event.streams &&
@@ -490,83 +452,64 @@ async function createPeerConnection() {
           event.streams[0];
 
         updateVideoPlaceholders();
-
-        debug(
-          "Remote stream attached to video"
-        );
       }
     }
   );
+
+
+  /* ----------------------------------------------------------
+     ICE CANDIDATES
+     ---------------------------------------------------------- */
 
   peerConnection.addEventListener(
     "icecandidate",
     (event) => {
-      if (!event.candidate) {
+      if (event.candidate) {
         debug(
-          "ICE gathering finished."
+          "Sending ICE candidate:",
+          getCandidateSummary(event.candidate)
         );
 
-        return;
+        sendMessage({
+          type: "ice-candidate",
+          candidate: event.candidate
+        });
+      } else {
+        debug("ICE gathering completed.");
       }
-
-      debug(
-        "Sending ICE candidate.",
-        {
-          type: event.candidate.type,
-          protocol: event.candidate.protocol
-        }
-      );
-
-      sendMessage({
-        type: "ice-candidate",
-        candidate: event.candidate
-      });
     }
   );
 
-  peerConnection.addEventListener(
-    "icegatheringstatechange",
-    () => {
-      debug(
-        "ICE gathering state:",
-        peerConnection.iceGatheringState
-      );
-    }
-  );
+
+  /* ----------------------------------------------------------
+     ICE CONNECTION STATE
+     ---------------------------------------------------------- */
 
   peerConnection.addEventListener(
     "iceconnectionstatechange",
     () => {
+      if (!peerConnection) {
+        return;
+      }
+
       const state =
         peerConnection.iceConnectionState;
 
-      debug(
-        "ICE state:",
-        state
-      );
+      debug("ICE state:", state);
 
       if (state === "checking") {
-        setStatus(
-          "Connecting video..."
-        );
+        setStatus("Connecting to stranger...");
       }
 
-      if (
-        state === "connected" ||
-        state === "completed"
-      ) {
-        setStatus(
-          "Video connected!"
-        );
+      if (state === "connected") {
+        setStatus("Connected!");
+      }
 
-        logSelectedCandidatePair();
+      if (state === "completed") {
+        setStatus("Connected!");
       }
 
       if (state === "disconnected") {
-        setStatus(
-          "Connection unstable, reconnecting..."
-        );
-
         debug(
           "ICE temporarily disconnected."
         );
@@ -577,18 +520,9 @@ async function createPeerConnection() {
           "Video connection failed."
         );
 
-        debugError(
-          "ICE connection failed."
+        debug(
+          "WebRTC connection failed. TURN may have failed."
         );
-
-        try {
-          peerConnection.restartIce();
-        } catch (error) {
-          debugError(
-            "ICE restart failed",
-            error
-          );
-        }
       }
 
       if (state === "closed") {
@@ -599,9 +533,18 @@ async function createPeerConnection() {
     }
   );
 
+
+  /* ----------------------------------------------------------
+     PEER CONNECTION STATE
+     ---------------------------------------------------------- */
+
   peerConnection.addEventListener(
     "connectionstatechange",
     () => {
+      if (!peerConnection) {
+        return;
+      }
+
       const state =
         peerConnection.connectionState;
 
@@ -611,16 +554,7 @@ async function createPeerConnection() {
       );
 
       if (state === "connected") {
-        setStatus(
-          "Video connected!"
-        );
-
-        setChatInputEnabled(
-          chatChannel &&
-          chatChannel.readyState === "open"
-        );
-
-        logSelectedCandidatePair();
+        setStatus("Connected!");
       }
 
       if (state === "failed") {
@@ -628,12 +562,27 @@ async function createPeerConnection() {
           "Video connection failed."
         );
       }
+
+      if (state === "disconnected") {
+        debug(
+          "Peer connection disconnected."
+        );
+      }
     }
   );
+
+
+  /* ----------------------------------------------------------
+     SIGNALING STATE
+     ---------------------------------------------------------- */
 
   peerConnection.addEventListener(
     "signalingstatechange",
     () => {
+      if (!peerConnection) {
+        return;
+      }
+
       debug(
         "Signaling state:",
         peerConnection.signalingState
@@ -641,39 +590,56 @@ async function createPeerConnection() {
     }
   );
 
+
+  /* ----------------------------------------------------------
+     NEGOTIATION NEEDED
+     ---------------------------------------------------------- */
+
   peerConnection.addEventListener(
     "negotiationneeded",
     () => {
-      debug(
-        "Negotiation needed."
-      );
+      debug("Negotiation needed.");
+    }
+  );
+
+
+  /* ----------------------------------------------------------
+     DATA CHANNEL
+     ---------------------------------------------------------- */
+
+  peerConnection.addEventListener(
+    "datachannel",
+    (event) => {
+      debug("Received chat DataChannel.");
+
+      setupChatChannel(event.channel);
     }
   );
 }
 
-// ==================================================
-// CREATE OFFER
-// ==================================================
+
+/* ============================================================
+   CREATE OFFER
+   ============================================================ */
 
 async function createOffer() {
   if (!peerConnection) {
-    debugError(
-      "Cannot create offer. No PeerConnection."
+    debug(
+      "Cannot create offer. No peer connection."
     );
 
     return;
   }
 
   try {
-    debug(
-      "Creating WebRTC offer..."
-    );
+    /*
+      The caller creates the DataChannel.
 
-    // Only the caller creates the chat data channel.
-    if (
-      !chatChannel ||
-      chatChannel.readyState === "closed"
-    ) {
+      The other browser receives it through the
+      "datachannel" event.
+    */
+
+    if (!chatChannel) {
       const channel =
         peerConnection.createDataChannel(
           "chat"
@@ -685,58 +651,40 @@ async function createOffer() {
     const offer =
       await peerConnection.createOffer();
 
-    debug(
-      "Setting local description..."
-    );
-
     await peerConnection.setLocalDescription(
       offer
     );
 
-    debug(
-      "Sending offer..."
-    );
+    debug("Sending offer.");
 
     sendMessage({
       type: "offer",
-      offer:
-        peerConnection.localDescription
+      offer: peerConnection.localDescription
     });
 
   } catch (error) {
-    debugError(
-      "Failed to create offer",
+    console.error(
+      "[HEY] Error creating offer:",
       error
     );
   }
 }
 
-// ==================================================
-// HANDLE OFFER
-// ==================================================
 
-async function handleOffer(message) {
+/* ============================================================
+   HANDLE OFFER
+   ============================================================ */
+
+async function handleOffer(offer) {
   if (!peerConnection) {
-    debugError(
-      "Received offer but PeerConnection does not exist."
-    );
-
-    return;
+    createPeerConnection();
   }
 
   try {
-    debug(
-      "Received WebRTC offer."
-    );
+    debug("Received WebRTC offer.");
 
     await peerConnection.setRemoteDescription(
-      new RTCSessionDescription(
-        message.offer
-      )
-    );
-
-    debug(
-      "Remote description set."
+      new RTCSessionDescription(offer)
     );
 
     await processPendingIceCandidates();
@@ -748,485 +696,841 @@ async function handleOffer(message) {
       answer
     );
 
-    debug(
-      "Sending answer..."
-    );
+    debug("Sending answer.");
 
     sendMessage({
       type: "answer",
-      answer:
-        peerConnection.localDescription
+      answer: peerConnection.localDescription
     });
 
   } catch (error) {
-    debugError(
-      "Failed to handle offer",
+    console.error(
+      "[HEY] Error handling offer:",
       error
     );
   }
 }
 
-// ==================================================
-// HANDLE ANSWER
-// ==================================================
 
-async function handleAnswer(message) {
+/* ============================================================
+   HANDLE ANSWER
+   ============================================================ */
+
+async function handleAnswer(answer) {
   if (!peerConnection) {
-    debugError(
-      "Received answer but PeerConnection does not exist."
-    );
-
     return;
   }
 
   try {
-    debug(
-      "Received WebRTC answer."
-    );
+    debug("Received WebRTC answer.");
 
     await peerConnection.setRemoteDescription(
-      new RTCSessionDescription(
-        message.answer
-      )
-    );
-
-    debug(
-      "Remote answer description set."
+      new RTCSessionDescription(answer)
     );
 
     await processPendingIceCandidates();
 
   } catch (error) {
-    debugError(
-      "Failed to handle answer",
+    console.error(
+      "[HEY] Error handling answer:",
       error
     );
   }
 }
 
-// ==================================================
-// HANDLE ICE CANDIDATE
-// ==================================================
 
-async function handleIceCandidate(message) {
-  if (!message.candidate) {
+/* ============================================================
+   HANDLE ICE CANDIDATE
+   ============================================================ */
+
+async function handleIceCandidate(candidate) {
+  if (!peerConnection) {
     return;
   }
 
-  const candidateText =
-    message.candidate.candidate || "";
+  /*
+    ICE candidates can arrive before remote SDP.
 
-  debug(
-    "Received remote ICE candidate.",
-    candidateText
-  );
+    Save them until remoteDescription exists.
+  */
 
   if (
-    !peerConnection ||
-    !peerConnection.remoteDescription
+    !peerConnection.remoteDescription ||
+    !peerConnection.remoteDescription.type
   ) {
     debug(
       "Remote description not ready."
-    );
-
-    pendingIceCandidates.push(
-      message.candidate
     );
 
     debug(
       "Saving ICE candidate for later."
     );
 
+    pendingIceCandidates.push(candidate);
+
     return;
   }
 
   try {
     await peerConnection.addIceCandidate(
-      new RTCIceCandidate(
-        message.candidate
-      )
-    );
-
-    debug(
-      "ICE candidate added."
+      new RTCIceCandidate(candidate)
     );
 
   } catch (error) {
-    debugError(
-      "Failed to add ICE candidate",
+    console.error(
+      "[HEY] Error adding ICE candidate:",
       error
     );
   }
 }
 
-// ==================================================
-// PROCESS SAVED ICE CANDIDATES
-// ==================================================
+
+/* ============================================================
+   PROCESS SAVED ICE CANDIDATES
+   ============================================================ */
 
 async function processPendingIceCandidates() {
+  if (!peerConnection) {
+    return;
+  }
+
   if (
-    !peerConnection ||
     !peerConnection.remoteDescription ||
-    pendingIceCandidates.length === 0
+    !peerConnection.remoteDescription.type
   ) {
     return;
   }
 
+  if (pendingIceCandidates.length === 0) {
+    return;
+  }
+
   debug(
-    `Processing ${pendingIceCandidates.length} saved ICE candidates.`
+    "Processing",
+    pendingIceCandidates.length,
+    "saved ICE candidates."
   );
 
   const candidates =
-    [...pendingIceCandidates];
+    pendingIceCandidates;
 
   pendingIceCandidates = [];
 
-  for (
-    const candidate of candidates
-  ) {
+  for (const candidate of candidates) {
     try {
       await peerConnection.addIceCandidate(
-        new RTCIceCandidate(
-          candidate
-        )
+        new RTCIceCandidate(candidate)
       );
-
-      debug(
-        "Saved ICE candidate added."
-      );
-
     } catch (error) {
-      debugError(
-        "Failed to add saved ICE candidate",
+      console.error(
+        "[HEY] Error processing saved ICE candidate:",
         error
       );
     }
   }
 }
 
-// ==================================================
-// PEER DISCONNECTED
-// ==================================================
+
+/* ============================================================
+   HANDLE SIGNALING MESSAGE
+   ============================================================ */
+
+async function handleSignalingMessage(message) {
+  switch (message.type) {
+
+    case "waiting":
+      isMatched = false;
+
+      updateMatchButtons();
+
+      setStatus(
+        "Waiting for a stranger..."
+      );
+
+      break;
+
+
+    case "matched":
+      isMatched = true;
+
+      chatEnabled = true;
+
+      clearChat();
+
+      updateMatchButtons();
+
+      setStatus(
+        "Matched! Connecting..."
+      );
+
+      break;
+
+
+    case "create-offer":
+      debug(
+        "Server asked us to create an offer."
+      );
+
+      await createOffer();
+
+      break;
+
+
+    case "offer":
+      await handleOffer(
+        message.offer
+      );
+
+      break;
+
+
+    case "answer":
+      await handleAnswer(
+        message.answer
+      );
+
+      break;
+
+
+    case "ice-candidate":
+      await handleIceCandidate(
+        message.candidate
+      );
+
+      break;
+
+
+    case "peer-disconnected":
+      handlePeerDisconnected();
+
+      break;
+
+
+    default:
+      debug(
+        "Unknown signaling message:",
+        message.type
+      );
+  }
+}
+
+
+/* ============================================================
+   PEER DISCONNECTED
+   ============================================================ */
 
 function handlePeerDisconnected() {
   debug(
-    "Peer disconnected."
+    "Stranger disconnected."
   );
 
   isMatched = false;
 
-  updateMatchButtons();
-
-  pendingIceCandidates = [];
-
   closeChatChannel();
+
+  clearChat();
 
   if (peerConnection) {
     try {
       peerConnection.close();
     } catch (error) {
-      debugError(
-        "Failed to close peer connection",
+      console.warn(
+        "[HEY] Error closing peer connection:",
         error
       );
     }
-
-    peerConnection = null;
   }
+
+  peerConnection = null;
+
+  pendingIceCandidates = [];
 
   remoteVideo.srcObject = null;
 
   updateVideoPlaceholders();
 
-  clearChat();
-
-  if (localStream) {
-    createPeerConnection()
-      .then(() => {
-        setStatus(
-          "Partner disconnected. Finding someone new..."
-        );
-
-        sendMessage({
-          type: "ready"
-        });
-      })
-      .catch((error) => {
-        debugError(
-          "Failed to recreate PeerConnection",
-          error
-        );
-      });
-  }
-}
-
-// ==================================================
-// NEXT / SKIP
-// ==================================================
-
-async function nextPartner() {
-  if (!hasStartedCamera) {
-    return;
-  }
-
-  debug("Looking for next partner.");
-
-  isMatched = false;
   updateMatchButtons();
 
-  closeChatChannel();
+  if (hasStartedCamera) {
+    /*
+      Automatically create a fresh peer connection
+      and tell the server we are ready for another
+      stranger.
+    */
 
-  clearChat();
-
-  remoteVideo.srcObject = null;
-
-  updateVideoPlaceholders();
-
-  sendMessage({
-    type: "skip"
-  });
-
-  try {
-    await createPeerConnection();
-
-    setStatus(
-      "Finding someone new..."
-    );
+    createPeerConnection();
 
     sendMessage({
       type: "ready"
     });
 
+    setStatus(
+      "Stranger left. Looking for someone new..."
+    );
+  }
+}
+
+
+/* ============================================================
+   STOP VIDEO CHAT
+   ============================================================ */
+
+function stopVideoChat() {
+  debug(
+    "Stopping video chat and destroying connection."
+  );
+
+  /*
+    Tell the server to disconnect us from the
+    current stranger.
+
+    The server will notify the stranger.
+  */
+
+  sendMessage({
+    type: "stop"
+  });
+
+
+  /* ----------------------------------------------------------
+     LOCAL STATE
+     ---------------------------------------------------------- */
+
+  isMatched = false;
+
+  updateMatchButtons();
+
+
+  /* ----------------------------------------------------------
+     CHAT
+     ---------------------------------------------------------- */
+
+  closeChatChannel();
+
+  clearChat();
+
+
+  /* ----------------------------------------------------------
+     STOP CAMERA + MICROPHONE
+     ---------------------------------------------------------- */
+
+  if (localStream) {
+    localStream
+      .getTracks()
+      .forEach((track) => {
+        try {
+          track.stop();
+        } catch (error) {
+          console.warn(
+            "[HEY] Could not stop media track:",
+            error
+          );
+        }
+      });
+  }
+
+  localStream = null;
+
+
+  /* ----------------------------------------------------------
+     CLOSE WEBRTC
+     ---------------------------------------------------------- */
+
+  if (peerConnection) {
+    try {
+      peerConnection.close();
+    } catch (error) {
+      console.warn(
+        "[HEY] Error closing peer connection:",
+        error
+      );
+    }
+  }
+
+  peerConnection = null;
+
+  pendingIceCandidates = [];
+
+
+  /* ----------------------------------------------------------
+     CLEAR VIDEO
+     ---------------------------------------------------------- */
+
+  remoteVideo.srcObject = null;
+
+  localVideo.srcObject = null;
+
+
+  /* ----------------------------------------------------------
+     RESET STATE
+     ---------------------------------------------------------- */
+
+  hasStartedCamera = false;
+
+  startButton.disabled = false;
+
+  updateStopButton();
+
+  updateVideoPlaceholders();
+
+  setStatus(
+    "Stopped. Click Start Camera when you want to begin again."
+  );
+}
+
+
+/* ============================================================
+   NEXT
+   ============================================================ */
+
+function nextStranger() {
+  if (!hasStartedCamera) {
+    return;
+  }
+
+  debug(
+    "Looking for next stranger."
+  );
+
+  sendMessage({
+    type: "skip"
+  });
+
+  isMatched = false;
+
+  closeChatChannel();
+
+  clearChat();
+
+  if (peerConnection) {
+    try {
+      peerConnection.close();
+    } catch (error) {
+      console.warn(
+        "[HEY] Error closing peer connection:",
+        error
+      );
+    }
+  }
+
+  peerConnection = null;
+
+  pendingIceCandidates = [];
+
+  remoteVideo.srcObject = null;
+
+  updateVideoPlaceholders();
+
+  updateMatchButtons();
+
+  setStatus(
+    "Looking for someone new..."
+  );
+}
+
+
+/* ============================================================
+   CHAT DATA CHANNEL
+   ============================================================ */
+
+function setupChatChannel(channel) {
+  chatChannel = channel;
+
+  chatChannel.addEventListener(
+    "open",
+    () => {
+      debug(
+        "Chat DataChannel opened."
+      );
+
+      chatEnabled = true;
+
+      updateMatchButtons();
+    }
+  );
+
+  chatChannel.addEventListener(
+    "close",
+    () => {
+      debug(
+        "Chat DataChannel closed."
+      );
+
+      chatChannel = null;
+    }
+  );
+
+  chatChannel.addEventListener(
+    "error",
+    (error) => {
+      console.error(
+        "[HEY] Chat DataChannel error:",
+        error
+      );
+    }
+  );
+
+  chatChannel.addEventListener(
+    "message",
+    (event) => {
+      try {
+        const message =
+          JSON.parse(event.data);
+
+        if (
+          message.type === "chat" &&
+          typeof message.text === "string"
+        ) {
+          addChatMessage(
+            message.text,
+            false
+          );
+        }
+
+      } catch (error) {
+        console.error(
+          "[HEY] Could not read chat message:",
+          error
+        );
+      }
+    }
+  );
+}
+
+
+/* ============================================================
+   CLOSE CHAT CHANNEL
+   ============================================================ */
+
+function closeChatChannel() {
+  if (!chatChannel) {
+    return;
+  }
+
+  try {
+    chatChannel.close();
   } catch (error) {
-    debugError(
-      "Failed to prepare next connection",
+    console.warn(
+      "[HEY] Error closing chat channel:",
+      error
+    );
+  }
+
+  chatChannel = null;
+}
+
+
+/* ============================================================
+   SEND CHAT MESSAGE
+   ============================================================ */
+
+function sendChatMessage() {
+  if (!chatEnabled) {
+    return;
+  }
+
+  if (!chatChannel) {
+    return;
+  }
+
+  if (
+    chatChannel.readyState !== "open"
+  ) {
+    return;
+  }
+
+  const text =
+    chatInput.value.trim();
+
+  if (!text) {
+    return;
+  }
+
+  const message = {
+    type: "chat",
+    text: text
+  };
+
+  try {
+    chatChannel.send(
+      JSON.stringify(message)
+    );
+
+    addChatMessage(
+      text,
+      true
+    );
+
+    chatInput.value = "";
+
+  } catch (error) {
+    console.error(
+      "[HEY] Failed to send chat message:",
       error
     );
   }
 }
 
-// ==================================================
-// REPORT MODAL
-// ==================================================
+
+/* ============================================================
+   ADD CHAT MESSAGE TO UI
+   ============================================================ */
+
+function addChatMessage(
+  text,
+  mine
+) {
+  const messageElement =
+    document.createElement("div");
+
+  messageElement.className =
+    `chat-message ${mine ? "mine" : "theirs"}`;
+
+  /*
+    textContent is intentional.
+
+    It prevents users from injecting HTML
+    through chat messages.
+  */
+
+  messageElement.textContent = text;
+
+  chatMessages.appendChild(
+    messageElement
+  );
+
+  chatMessages.scrollTop =
+    chatMessages.scrollHeight;
+}
+
+
+/* ============================================================
+   CLEAR CHAT
+   ============================================================ */
+
+function clearChat() {
+  chatMessages.innerHTML = "";
+}
+
+
+/* ============================================================
+   CHAT TOGGLE
+   ============================================================ */
+
+function toggleChat() {
+  chatEnabled = !chatEnabled;
+
+  chatToggleButton.textContent =
+    chatEnabled
+      ? "💬 Chat: ON"
+      : "💬 Chat: OFF";
+
+  /*
+    This only disables sending.
+
+    The DataChannel itself stays alive.
+  */
+
+  chatInput.disabled =
+    !chatEnabled;
+
+  sendChatButton.disabled =
+    !chatEnabled;
+}
+
+
+/* ============================================================
+   REPORT MODAL
+   ============================================================ */
 
 function openReportModal() {
   if (!isMatched) {
     return;
   }
 
-  reportModal.classList.add("open");
-  reportModal.setAttribute(
-    "aria-hidden",
-    "false"
+  reportModalBackdrop.classList.add(
+    "show"
   );
-
-  submitReportButton.disabled = true;
-
-  document
-    .querySelectorAll(
-      'input[name="reportReason"]'
-    )
-    .forEach((input) => {
-      input.checked = false;
-    });
 }
+
 
 function closeReportModal() {
-  reportModal.classList.remove("open");
-  reportModal.setAttribute(
-    "aria-hidden",
-    "true"
+  reportModalBackdrop.classList.remove(
+    "show"
   );
 }
 
-function submitReport() {
+
+function getSelectedReportReason() {
   const selected =
     document.querySelector(
       'input[name="reportReason"]:checked'
     );
 
-  if (!selected) {
+  return selected
+    ? selected.value
+    : null;
+}
+
+
+function submitReport() {
+  if (!isMatched) {
+    closeReportModal();
     return;
   }
 
-  const reason = selected.value;
+  const reason =
+    getSelectedReportReason();
+
+  if (!reason) {
+    alert(
+      "Please select a reason for the report."
+    );
+
+    return;
+  }
 
   debug(
-    "Report submitted",
+    "Submitting report:",
     reason
   );
 
-  // Send the report through the signaling connection.
-  // The server can later store this in a database/moderation system.
+  /*
+    The server currently needs to be expanded to
+    store/process reports. For now we send the
+    report event to the signaling server.
+  */
+
   sendMessage({
     type: "report",
-    reason
+    reason: reason
   });
 
   closeReportModal();
 
-  setStatus(
-    "Report submitted. Thank you."
+  alert(
+    "Thank you. Your report has been submitted."
   );
 }
 
-// ==================================================
-// GET SELECTED ICE CANDIDATE PAIR
-// ==================================================
 
-async function logSelectedCandidatePair() {
-  if (!peerConnection) {
-    return;
+/* ============================================================
+   ICE DEBUG HELPER
+   ============================================================ */
+
+function getCandidateSummary(candidate) {
+  if (!candidate) {
+    return null;
   }
 
-  try {
-    const stats =
-      await peerConnection.getStats();
+  const text =
+    candidate.candidate || "";
 
-    let selectedPair = null;
+  const typeMatch =
+    text.match(/ typ ([a-zA-Z0-9]+)/);
 
-    stats.forEach((report) => {
-      if (
-        report.type === "candidate-pair" &&
-        (
-          report.selected === true ||
-          report.nominated === true
-        )
-      ) {
-        selectedPair = report;
-      }
-    });
-
-    if (!selectedPair) {
-      debug(
-        "No selected ICE candidate pair found yet."
-      );
-
-      return;
-    }
-
-    const localCandidate =
-      stats.get(
-        selectedPair.localCandidateId
-      );
-
-    const remoteCandidate =
-      stats.get(
-        selectedPair.remoteCandidateId
-      );
-
-    debug(
-      "SELECTED ICE CANDIDATE PAIR",
-      {
-        localType:
-          localCandidate?.candidateType,
-
-        remoteType:
-          remoteCandidate?.candidateType,
-
-        localProtocol:
-          localCandidate?.protocol,
-
-        remoteProtocol:
-          remoteCandidate?.protocol,
-
-        state:
-          selectedPair.state
-      }
+  const protocolMatch =
+    text.match(
+      /candidate:\S+ \d+ (\w+)/i
     );
 
-  } catch (error) {
-    debugError(
-      "Could not inspect selected ICE candidate pair",
-      error
-    );
-  }
+  return {
+    type:
+      typeMatch
+        ? typeMatch[1]
+        : "unknown",
+
+    protocol:
+      protocolMatch
+        ? protocolMatch[1]
+        : "unknown"
+  };
 }
 
-// ==================================================
-// UI EVENTS
-// ==================================================
+
+/* ============================================================
+   BUTTON EVENTS
+   ============================================================ */
 
 startButton.addEventListener(
   "click",
   startCamera
 );
 
-chatForm.addEventListener(
-  "submit",
-  (event) => {
-    event.preventDefault();
 
-    const text =
-      chatInput.value.trim();
-
-    if (!text) {
-      return;
-    }
-
-    sendChatMessage(text);
-
-    chatInput.value = "";
-    chatInput.focus();
-  }
-);
-
-chatToggle.addEventListener(
+stopButton.addEventListener(
   "click",
-  () => {
-    chatEnabled = !chatEnabled;
-    updateChatUI();
-  }
+  stopVideoChat
 );
+
 
 nextButton.addEventListener(
   "click",
-  nextPartner
+  nextStranger
 );
+
+
+chatToggleButton.addEventListener(
+  "click",
+  toggleChat
+);
+
 
 reportButton.addEventListener(
   "click",
   openReportModal
 );
 
+
 cancelReportButton.addEventListener(
   "click",
   closeReportModal
 );
+
 
 submitReportButton.addEventListener(
   "click",
   submitReport
 );
 
-document
-  .querySelectorAll(
-    'input[name="reportReason"]'
-  )
-  .forEach((input) => {
-    input.addEventListener(
-      "change",
-      () => {
-        submitReportButton.disabled = false;
-      }
-    );
-  });
 
-reportModal.addEventListener(
+chatForm.addEventListener(
+  "submit",
+  (event) => {
+    event.preventDefault();
+
+    sendChatMessage();
+  }
+);
+
+
+/* ============================================================
+   CLOSE REPORT MODAL WHEN CLICKING BACKDROP
+   ============================================================ */
+
+reportModalBackdrop.addEventListener(
   "click",
   (event) => {
-    if (event.target === reportModal) {
+    if (
+      event.target ===
+      reportModalBackdrop
+    ) {
       closeReportModal();
     }
   }
 );
 
-// ==================================================
-// INITIALIZATION
-// ==================================================
+
+/* ============================================================
+   INITIAL UI STATE
+   ============================================================ */
+
+updateMatchButtons();
+
+updateStopButton();
 
 updateVideoPlaceholders();
-updateMatchButtons();
-updateChatUI();
 
-connectSignaling();
+setStatus(
+  "Click Start Camera to begin"
+);
