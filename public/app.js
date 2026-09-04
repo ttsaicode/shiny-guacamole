@@ -37,7 +37,7 @@ const chatToggleButton = document.getElementById("chatToggleButton");
 const reportButton = document.getElementById("reportButton");
 
 const statusElement = document.getElementById("status");
-const onlineCountElement = document.getElementById("onlineCount");
+const onlineCountElement = document.getElementById("onlineCountText");
 
 const chatForm = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
@@ -217,7 +217,12 @@ function connectToSignalingServer() {
 
       if (message.type === "online-count") {
         if (onlineCountElement) {
-          onlineCountElement.textContent = `● ${message.count} online`;
+          const count = Number.isFinite(Number(message.count))
+            ? Number(message.count)
+            : 0;
+
+          onlineCountElement.textContent =
+            `${count} ${count === 1 ? "person" : "people"} online`;
         }
         return;
       }
@@ -1542,3 +1547,12 @@ updateVideoPlaceholders();
 setStatus(
   "Click Start Camera to begin"
 );
+
+/*
+  Connect to the signaling server immediately.
+
+  This does NOT request camera or microphone permission.
+  It only keeps the realtime online counter updated for
+  everyone who has the page open.
+*/
+connectToSignalingServer();
