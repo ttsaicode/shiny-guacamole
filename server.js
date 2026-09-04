@@ -101,6 +101,20 @@ let nextClientId = 1;
 // Browsers waiting for a match.
 const waitingClients = [];
 
+// Every browser currently connected to the signaling server.
+const connectedClients = new Set();
+
+function broadcastOnlineCount() {
+  const message = {
+    type: "online-count",
+    count: connectedClients.size
+  };
+
+  for (const client of connectedClients) {
+    send(client, message);
+  }
+}
+
 
 // ==================================================
 // HELPER: SEND MESSAGE
@@ -229,8 +243,12 @@ function tryMatchUsers() {
 
 wss.on("connection", (socket, request) => {
   socket.id = nextClientId++;
+
+  connectedClients.add(socket);
   socket.ready = false;
   socket.peer = null;
+
+  broadcastOnlineCount();
 
   console.log("");
   console.log(
@@ -412,6 +430,9 @@ wss.on("connection", (socket, request) => {
   // ------------------------------------------------
 
   socket.on("close", () => {
+    connectedClients.delete(socket);
+    broadcastOnlineCount();
+
     console.log("");
     console.log(
       `[SERVER] Client ${socket.id} disconnected`
