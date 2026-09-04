@@ -62,10 +62,42 @@
       color: #9d7cff;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 16px;
+      min-width: 0;
+    }
+
     .status {
       font-size: 13px;
       color: #aeb3c7;
       text-align: right;
+    }
+
+    .online-count {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex-shrink: 0;
+      padding: 7px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.035);
+      color: #d8dbea;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      backdrop-filter: blur(10px);
+    }
+
+    .online-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.65);
     }
 
     /* ---------------- MAIN VIDEO AREA ---------------- */
@@ -81,7 +113,7 @@
 
     .video-grid {
       width: 100%;
-      max-width: 1500px;
+      max-width: 1650px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 18px;
@@ -452,6 +484,19 @@
         font-size: 22px;
       }
 
+      .header-right {
+        gap: 8px;
+      }
+
+      .status {
+        display: none;
+      }
+
+      .online-count {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+
       .video-area {
         padding: 14px;
       }
@@ -488,8 +533,9 @@
     }
 
     @media (max-width: 500px) {
-      .status {
-        font-size: 11px;
+      .online-count {
+        font-size: 10px;
+        padding: 5px 7px;
       }
 
       .video-area {
@@ -516,8 +562,20 @@
         Hey<span>.</span>
       </div>
 
-      <div id="status" class="status">
-        Click Start Camera to begin
+      <div class="header-right">
+        <div id="status" class="status">
+          Click Start Camera to begin
+        </div>
+
+        <div
+          id="onlineCount"
+          class="online-count"
+          aria-live="polite"
+          title="People currently connected to Hey"
+        >
+          <span class="online-dot"></span>
+          <span id="onlineCountText">0 online</span>
+        </div>
       </div>
     </header>
 
