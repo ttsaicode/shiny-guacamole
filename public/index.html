@@ -20,9 +20,9 @@
       font-family: Arial, Helvetica, sans-serif;
       background:
         radial-gradient(circle at top left, #1d2147 0%, transparent 35%),
-        radial-gradient(circle at bottom right, #171a35 0%, transparent 35%),
-        #090a14;
-      color: #fff;
+        radial-gradient(circle at bottom right, #29154c 0%, transparent 35%),
+        #090b18;
+      color: white;
     }
 
     body {
@@ -30,30 +30,36 @@
       overflow-x: hidden;
     }
 
-    button {
-      font-family: inherit;
+    .app {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
     /* ---------------- HEADER ---------------- */
 
-    header {
-      width: 100%;
-      height: 72px;
-      padding: 0 32px;
+    .top-bar {
+      height: 68px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      background: rgba(9, 10, 20, 0.72);
-      backdrop-filter: blur(16px);
+      padding: 0 24px;
+      background: rgba(7, 9, 22, 0.82);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(14px);
       position: relative;
-      z-index: 10;
+      z-index: 20;
     }
 
     .logo {
       font-size: 25px;
       font-weight: 800;
-      letter-spacing: -0.8px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span {
+      color: #9d7cff;
     }
 
     .header-right {
@@ -97,157 +103,380 @@
     /* ---------------- MAIN VIDEO AREA ---------------- */
 
     .video-area {
-      width: calc(100% - 64px);
+      flex: 1;
+      width: 100%;
+      padding: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .video-grid {
+      width: 100%;
       max-width: 1650px;
-      min-height: 560px;
-      margin: 28px auto 0;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 18px;
     }
 
     .video-card {
       position: relative;
       width: 100%;
-      min-height: 560px;
-      border-radius: 18px;
+      aspect-ratio: 16 / 10;
+      min-height: 300px;
+      background: #101323;
+      border-radius: 20px;
       overflow: hidden;
-      background: #11131f;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
     }
 
     video {
       width: 100%;
       height: 100%;
-      min-height: 560px;
-      display: block;
       object-fit: cover;
-      background: #11131f;
+      display: block;
+      background: #111426;
+    }
+
+    .video-label {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 5;
+
+      padding: 7px 11px;
+      border-radius: 9px;
+
+      background: rgba(5, 7, 18, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      font-size: 13px;
+      font-weight: 600;
+
+      backdrop-filter: blur(8px);
     }
 
     .video-placeholder {
       position: absolute;
       inset: 0;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       flex-direction: column;
-      gap: 12px;
-      color: #737991;
+      gap: 8px;
+
+      color: #8f95ad;
       background:
-        radial-gradient(circle at center, rgba(68, 74, 116, 0.12), transparent 45%),
-        #11131f;
+        radial-gradient(circle at center, rgba(120, 91, 255, 0.12), transparent 45%),
+        #101323;
+
+      pointer-events: none;
     }
 
     .placeholder-icon {
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.05);
-      font-size: 24px;
+      font-size: 40px;
+      opacity: 0.65;
     }
 
     .placeholder-text {
       font-size: 14px;
-      color: #858ba1;
     }
 
-    .video-label {
+    /* ---------------- CHAT ---------------- */
+
+    .chat-panel {
       position: absolute;
-      left: 14px;
-      bottom: 14px;
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.55);
-      color: #fff;
-      font-size: 12px;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+
+      z-index: 8;
+
+      display: flex;
+      flex-direction: column;
+
+      pointer-events: none;
+    }
+
+    .chat-messages {
+      max-height: 170px;
+      overflow-y: auto;
+
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+
+      margin-bottom: 9px;
+      padding-right: 3px;
+    }
+
+    .chat-message {
+      width: fit-content;
+      max-width: 78%;
+
+      padding: 8px 11px;
+
+      border-radius: 12px;
+
+      font-size: 13px;
+      line-height: 1.35;
+
+      background: rgba(7, 9, 20, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+
+      backdrop-filter: blur(12px);
+
+      word-break: break-word;
+    }
+
+    .chat-message.mine {
+      align-self: flex-end;
+      background: rgba(111, 78, 220, 0.88);
+    }
+
+    .chat-message.theirs {
+      align-self: flex-start;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+
+      pointer-events: auto;
+    }
+
+    .chat-input {
+      flex: 1;
+      min-width: 0;
+
+      height: 40px;
+
+      padding: 0 13px;
+
+      border-radius: 11px;
+
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      outline: none;
+
+      background: rgba(7, 9, 20, 0.82);
+      color: white;
+
+      backdrop-filter: blur(12px);
+    }
+
+    .chat-input::placeholder {
+      color: #858ba2;
+    }
+
+    .send-button {
+      height: 40px;
+      padding: 0 14px;
+
+      border: 0;
+      border-radius: 11px;
+
+      background: #8b6cff;
+      color: white;
+
       font-weight: 700;
-      backdrop-filter: blur(8px);
+      cursor: pointer;
+    }
+
+    .send-button:hover {
+      background: #9a7dff;
     }
 
     /* ---------------- CONTROLS ---------------- */
 
     .controls {
-      width: calc(100% - 64px);
-      max-width: 1650px;
-      margin: 20px auto 32px;
+      position: relative;
+      z-index: 10;
+
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+
       gap: 12px;
+
+      /* Lower than before so it doesn't overlap the chat */
+      margin-top: 10px;
+
+      padding: 0 22px 22px;
     }
 
-    button {
-      border: none;
-      cursor: pointer;
-      border-radius: 10px;
-      padding: 12px 20px;
+    .control-button {
+      min-width: 105px;
+      height: 44px;
+
+      padding: 0 16px;
+
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+
+      background: rgba(22, 25, 45, 0.95);
+      color: white;
+
       font-size: 14px;
       font-weight: 700;
+
+      cursor: pointer;
+
       transition:
         transform 0.15s ease,
-        opacity 0.15s ease,
-        background 0.15s ease;
+        background 0.15s ease,
+        opacity 0.15s ease;
     }
 
-    button:hover {
+    .control-button:hover:not(:disabled) {
       transform: translateY(-1px);
+      background: rgba(35, 39, 65, 1);
     }
 
-    button:active {
+    .control-button:active:not(:disabled) {
       transform: translateY(0);
     }
 
-    button:disabled {
+    .control-button.primary {
+      background: #7c5cff;
+      border-color: #7c5cff;
+    }
+
+    .control-button.primary:hover:not(:disabled) {
+      background: #8d70ff;
+    }
+
+    .control-button.stop {
+      background: rgba(175, 55, 72, 0.9);
+      border-color: rgba(255, 105, 125, 0.25);
+    }
+
+    .control-button.stop:hover:not(:disabled) {
+      background: rgba(198, 61, 80, 1);
+    }
+
+    .control-button.report {
+      background: rgba(80, 84, 108, 0.75);
+    }
+
+    .control-button:disabled {
+      opacity: 0.42;
       cursor: not-allowed;
-      opacity: 0.45;
       transform: none;
     }
 
-    .primary-btn {
-      background: #fff;
-      color: #0b0c14;
+    /* ---------------- REPORT MODAL ---------------- */
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+
+      z-index: 100;
+
+      display: none;
+      justify-content: center;
+      align-items: center;
+
+      padding: 20px;
+
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(7px);
     }
 
-    .secondary-btn {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .report-modal {
+      width: 100%;
+      max-width: 440px;
+
+      padding: 24px;
+
+      border-radius: 18px;
+
+      background: #15182b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+    }
+
+    .report-modal h2 {
+      margin: 0 0 8px;
+      font-size: 21px;
+    }
+
+    .report-modal p {
+      margin: 0 0 18px;
+      color: #aeb3c7;
+      font-size: 14px;
+    }
+
+    .report-options {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .report-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      padding: 11px 12px;
+
+      border-radius: 10px;
+
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+
+      cursor: pointer;
+
+      font-size: 14px;
+    }
+
+    .report-option:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .report-option input {
+      accent-color: #8b6cff;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+
+      margin-top: 20px;
+    }
+
+    .modal-button {
+      height: 40px;
+
+      padding: 0 15px;
+
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      color: white;
+      background: #252943;
+
+      cursor: pointer;
+
+      font-weight: 700;
+    }
+
+    .modal-button.submit {
+      background: #7c5cff;
+      border-color: #7c5cff;
     }
 
     /* ---------------- RESPONSIVE ---------------- */
 
-    @media (max-width: 900px) {
-      header {
-        padding: 0 20px;
-      }
-
-      .video-area {
-        width: calc(100% - 40px);
-        grid-template-columns: 1fr;
-        min-height: auto;
-      }
-
-      .video-card {
-        min-height: 360px;
-      }
-
-      video {
-        min-height: 360px;
-      }
-
-      .controls {
-        width: calc(100% - 40px);
-      }
-    }
-
-    @media (max-width: 600px) {
-      header {
-        height: 64px;
+    @media (max-width: 850px) {
+      .top-bar {
+        height: 60px;
         padding: 0 16px;
       }
 
@@ -269,437 +498,319 @@
       }
 
       .video-area {
-        width: calc(100% - 24px);
-        margin-top: 16px;
-        gap: 12px;
+        padding: 14px;
+      }
+
+      .video-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
       }
 
       .video-card {
-        min-height: 300px;
-        border-radius: 14px;
-      }
-
-      video {
-        min-height: 300px;
+        aspect-ratio: 16 / 9;
+        min-height: 0;
       }
 
       .controls {
-        width: calc(100% - 24px);
-        margin-top: 14px;
-        margin-bottom: 20px;
+        margin-top: 0;
+        padding: 0 14px 18px;
+
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
-      button {
-        padding: 11px 16px;
+      .control-button {
+        min-width: 0;
+        flex: 1;
+        height: 42px;
+        padding: 0 10px;
+      }
+
+      .chat-panel {
+        left: 13px;
+        right: 13px;
+        bottom: 13px;
       }
     }
 
-    @media (max-width: 380px) {
+    @media (max-width: 500px) {
       .online-count {
         font-size: 10px;
         padding: 5px 7px;
       }
 
       .video-area {
-        width: calc(100% - 16px);
+        padding: 10px;
       }
 
-      .controls {
-        width: calc(100% - 16px);
+      .control-button {
+        font-size: 12px;
+      }
+
+      .chat-messages {
+        max-height: 130px;
       }
     }
   </style>
 </head>
 
 <body>
+  <div class="app">
 
-  <header>
-    <div class="logo">Hey.</div>
-
-    <div class="header-right">
-      <div id="status" class="status">
-        Click Start Camera to begin
+    <!-- HEADER -->
+    <header class="top-bar">
+      <div class="logo">
+        Hey<span>.</span>
       </div>
 
-      <div
-        id="onlineCount"
-        class="online-count"
-        aria-live="polite"
-        title="People currently connected to Hey"
-      >
-        <span class="online-dot"></span>
-        <span id="onlineCountText">0 online</span>
+      <div class="header-right">
+        <div id="status" class="status">
+          Click Start Camera to begin
+        </div>
+
+        <div
+          id="onlineCount"
+          class="online-count"
+          aria-live="polite"
+          title="People currently connected to Hey"
+        >
+          <span class="online-dot"></span>
+          <span id="onlineCountText">0 online</span>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main>
+    <!-- VIDEOS -->
+    <main class="video-area">
+      <div class="video-grid">
 
-    <section class="video-area">
+        <!-- STRANGER -->
+        <section class="video-card">
+          <video
+            id="remoteVideo"
+            autoplay
+            playsinline
+          ></video>
 
-      <div class="video-card">
-        <video id="localVideo" autoplay muted playsinline></video>
-
-        <div id="localPlaceholder" class="video-placeholder">
-          <div class="placeholder-icon">◉</div>
-          <div class="placeholder-text">
-            Your camera
+          <div class="video-label">
+            Stranger
           </div>
-        </div>
 
-        <div class="video-label">
-          You
-        </div>
-      </div>
-
-      <div class="video-card">
-        <video id="remoteVideo" autoplay playsinline></video>
-
-        <div id="remotePlaceholder" class="video-placeholder">
-          <div class="placeholder-icon">?</div>
-          <div class="placeholder-text">
-            Waiting for someone...
+          <div
+            id="remotePlaceholder"
+            class="video-placeholder"
+          >
+            <div class="placeholder-icon">👤</div>
+            <div class="placeholder-text">
+              Waiting for someone...
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div class="video-label">
-          Stranger
-        </div>
+        <!-- YOU -->
+        <section class="video-card">
+          <video
+            id="localVideo"
+            autoplay
+            muted
+            playsinline
+          ></video>
+
+          <div class="video-label">
+            You
+          </div>
+
+          <div
+            id="localPlaceholder"
+            class="video-placeholder"
+          >
+            <div class="placeholder-icon">📷</div>
+            <div class="placeholder-text">
+              Your camera is off
+            </div>
+          </div>
+
+          <!-- CHAT FLOATING OVER YOUR VIDEO -->
+          <div class="chat-panel">
+
+            <div
+              id="chatMessages"
+              class="chat-messages"
+            ></div>
+
+            <form
+              id="chatForm"
+              class="chat-input-row"
+            >
+              <input
+                id="chatInput"
+                class="chat-input"
+                type="text"
+                maxlength="500"
+                autocomplete="off"
+                placeholder="Type a message..."
+              />
+
+              <button
+                id="sendChatButton"
+                class="send-button"
+                type="submit"
+              >
+                Send
+              </button>
+            </form>
+
+          </div>
+        </section>
+
       </div>
+    </main>
 
-    </section>
-
-    <section class="controls">
+    <!-- CONTROLS -->
+    <div class="controls">
 
       <button
-        id="startCameraBtn"
-        class="primary-btn"
+        id="startButton"
+        class="control-button primary"
+        type="button"
       >
-        Start Camera
+        🎥 Start Camera
       </button>
 
       <button
-        id="nextBtn"
-        class="secondary-btn"
+        id="chatToggleButton"
+        class="control-button"
+        type="button"
         disabled
       >
-        Next
+        💬 Chat: ON
       </button>
 
-    </section>
-
-  </main>
-
-  <script>
-
-    /* ---------------- DOM ---------------- */
-
-    const localVideo =
-      document.getElementById("localVideo");
-
-    const remoteVideo =
-      document.getElementById("remoteVideo");
-
-    const localPlaceholder =
-      document.getElementById("localPlaceholder");
-
-    const remotePlaceholder =
-      document.getElementById("remotePlaceholder");
-
-    const startCameraBtn =
-      document.getElementById("startCameraBtn");
-
-    const nextBtn =
-      document.getElementById("nextBtn");
-
-    const statusElement =
-      document.getElementById("status");
-
-    const onlineCountElement =
-      document.getElementById("onlineCountText");
-
-
-    /* ---------------- STATE ---------------- */
-
-    let localStream = null;
-    let peerConnection = null;
-    let socket = null;
-
-
-    /* ---------------- CONFIG ---------------- */
-
-    const SIGNALING_SERVER =
-      `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
-
-
-    /* ---------------- UI ---------------- */
-
-    function setStatus(message) {
-
-      if (statusElement) {
-        statusElement.textContent = message;
-      }
-
-    }
-
-
-    function updateVideoPlaceholders() {
-
-      if (localVideo.srcObject) {
-
-        localPlaceholder.style.display = "none";
-
-      } else {
-
-        localPlaceholder.style.display = "flex";
-
-      }
-
-
-      if (remoteVideo.srcObject) {
-
-        remotePlaceholder.style.display = "none";
-
-      } else {
-
-        remotePlaceholder.style.display = "flex";
-
-      }
-
-    }
-
-
-    /* ---------------- ONLINE COUNT ---------------- */
-
-    function updateOnlineCount(count) {
-
-      if (!onlineCountElement) {
-        return;
-      }
-
-      const numericCount =
-        Number.isFinite(Number(count))
-          ? Number(count)
-          : 0;
-
-      onlineCountElement.textContent =
-        `${numericCount} ${
-          numericCount === 1
-            ? "person"
-            : "people"
-        } online`;
-
-    }
-
-
-    /* ---------------- SIGNALING ---------------- */
-
-    function connectToSignalingServer() {
-
-      if (socket &&
-          socket.readyState === WebSocket.OPEN) {
-
-        return;
-
-      }
-
-
-      socket =
-        new WebSocket(SIGNALING_SERVER);
-
-
-      socket.addEventListener(
-        "open",
-        () => {
-
-          setStatus(
-            "Connected. Click Start Camera to begin"
-          );
-
-        }
-      );
-
-
-      socket.addEventListener(
-        "message",
-        async event => {
-
-          let message;
-
-          try {
-
-            message =
-              JSON.parse(event.data);
-
-          } catch {
-
-            return;
-
-          }
-
-
-          if (message.type === "online-count") {
-
-            updateOnlineCount(
-              message.count
-            );
-
-            return;
-
-          }
-
-
-          /*
-            Existing signaling logic can handle
-            offer / answer / candidate messages here.
-          */
-
-        }
-      );
-
-
-      socket.addEventListener(
-        "close",
-        () => {
-
-          if (!localStream) {
-
-            setStatus(
-              "Disconnected from server"
-            );
-
-          }
-
-        }
-      );
-
-
-      socket.addEventListener(
-        "error",
-        () => {
-
-          if (!localStream) {
-
-            setStatus(
-              "Unable to connect to server"
-            );
-
-          }
-
-        }
-      );
-
-    }
-
-
-    /* ---------------- CAMERA ---------------- */
-
-    async function startCamera() {
-
-      try {
-
-        localStream =
-          await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-          });
-
-
-        localVideo.srcObject =
-          localStream;
-
-
-        startCameraBtn.disabled = true;
-
-        nextBtn.disabled = false;
-
-
-        updateVideoPlaceholders();
-
-
-        setStatus(
-          "Camera started. Looking for someone..."
-        );
-
-
-      } catch (error) {
-
-        console.error(error);
-
-        setStatus(
-          "Camera and microphone permission is required"
-        );
-
-      }
-
-    }
-
-
-    /* ---------------- NEXT ---------------- */
-
-    function nextPerson() {
-
-      if (peerConnection) {
-
-        peerConnection.close();
-
-        peerConnection = null;
-
-      }
-
-
-      remoteVideo.srcObject = null;
-
-      updateVideoPlaceholders();
-
-
-      setStatus(
-        "Looking for someone new..."
-      );
-
-
-      /*
-        Existing matchmaking logic should
-        request the next stranger here.
-      */
-
-    }
-
-
-    /* ---------------- EVENTS ---------------- */
-
-    startCameraBtn.addEventListener(
-      "click",
-      startCamera
-    );
-
-
-    nextBtn.addEventListener(
-      "click",
-      nextPerson
-    );
-
-
-    /* ---------------- INITIAL STATE ---------------- */
-
-    updateVideoPlaceholders();
-
-    setStatus(
-      "Click Start Camera to begin"
-    );
-
-
-    /*
-      Connect to the signaling server immediately.
-
-      This does NOT request camera or microphone permission.
-      It only keeps the realtime online counter updated for
-      everyone who has the page open.
-    */
-
-    connectToSignalingServer();
-
-  </script>
-
+      <button
+        id="reportButton"
+        class="control-button report"
+        type="button"
+        disabled
+      >
+        🚩 Report
+      </button>
+
+      <button
+        id="stopButton"
+        class="control-button stop"
+        type="button"
+        disabled
+      >
+        ⏹ Stop
+      </button>
+
+      <button
+        id="nextButton"
+        class="control-button"
+        type="button"
+        disabled
+      >
+        ⏭ Next
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- REPORT MODAL -->
+  <div
+    id="reportModalBackdrop"
+    class="modal-backdrop"
+  >
+    <div class="report-modal">
+
+      <h2>Report this person</h2>
+
+      <p>
+        Please tell us why you are reporting this user.
+      </p>
+
+      <div class="report-options">
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Nudity / Sexual content"
+          />
+          <span>Nudity / Sexual content</span>
+        </label>
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Harassment / Bullying"
+          />
+          <span>Harassment / Bullying</span>
+        </label>
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Hate / Abusive behavior"
+          />
+          <span>Hate / Abusive behavior</span>
+        </label>
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Spam / Advertising"
+          />
+          <span>Spam / Advertising</span>
+        </label>
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Underage user"
+          />
+          <span>Underage user</span>
+        </label>
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Other"
+          />
+          <span>Other</span>
+        </label>
+
+      </div>
+
+      <div class="modal-actions">
+
+        <button
+          id="cancelReportButton"
+          class="modal-button"
+          type="button"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="submitReportButton"
+          class="modal-button submit"
+          type="button"
+        >
+          Submit Report
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
 </body>
 </html>
