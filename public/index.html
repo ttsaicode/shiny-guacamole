@@ -1,226 +1,561 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <title>WebRTC Video Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Random Video Chat</title>
 
   <style>
+    :root {
+      --bg: #090b18;
+      --panel: #11172a;
+      --panel-2: #171b3b;
+      --border: rgba(255,255,255,.12);
+      --text: #f5f7ff;
+      --muted: #9ba2bd;
+      --purple: #625cff;
+      --purple-2: #7a73ff;
+      --danger: #e05261;
+      --danger-dark: #4d1f2b;
+      --shadow: 0 24px 70px rgba(0,0,0,.42);
+    }
+
     * {
       box-sizing: border-box;
     }
 
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(79,70,229,.18), transparent 32%),
+        radial-gradient(circle at 85% 80%, rgba(37,99,235,.10), transparent 30%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
     body {
-      margin: 0;
       min-height: 100vh;
-
-      font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      background: #111;
-      color: white;
+      padding: 28px;
+      overflow-x: hidden;
     }
 
-    header {
-      text-align: center;
-      padding: 25px 20px 10px;
+    button,
+    input {
+      font: inherit;
     }
 
-    header h1 {
-      margin: 0 0 10px;
+    .app {
+      width: min(1220px, 100%);
+      margin: 0 auto;
     }
 
-    header p {
-      margin: 0;
-      color: #aaa;
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
     }
 
-    .videos {
-      width: 100%;
-      max-width: 1200px;
-
-      margin: 20px auto;
-
-      padding: 20px;
-
-      display: grid;
-
-      grid-template-columns:
-        repeat(2, 1fr);
-
-      gap: 20px;
+    .brand {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.03em;
     }
 
-    .video-container {
-      position: relative;
-
-      width: 100%;
-
-      aspect-ratio: 16 / 9;
-
-      background: #222;
-
-      border-radius: 12px;
-
+    .status-pill {
+      max-width: 70%;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(15,20,38,.72);
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-stage {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: min(72vh, 720px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      background: #0d1221;
+      box-shadow: var(--shadow);
+    }
+
+    .video-panel {
+      position: relative;
+      min-width: 0;
+      min-height: 480px;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(94,88,255,.16), transparent 27%),
+        linear-gradient(145deg, #19183f, #11172b 72%);
+    }
+
+    .video-panel + .video-panel {
+      border-left: 1px solid rgba(255,255,255,.13);
+      background:
+        radial-gradient(circle at 50% 48%, rgba(75,85,150,.11), transparent 27%),
+        linear-gradient(145deg, #11172b, #101727 72%);
     }
 
     video {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
-
       object-fit: cover;
-
-      display: block;
-
-      background: #222;
+      background: transparent;
     }
 
-    .label {
+    #localVideo {
+      transform: scaleX(-1);
+    }
+
+    .video-label {
       position: absolute;
+      z-index: 4;
+      top: 18px;
+      left: 18px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(4,7,18,.72);
+      border: 1px solid rgba(255,255,255,.09);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
 
-      top: 10px;
-      left: 10px;
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      color: rgba(255,255,255,.34);
+      pointer-events: none;
+    }
 
-      padding: 6px 10px;
+    .placeholder-icon {
+      width: 58px;
+      height: 58px;
+      opacity: .65;
+    }
 
-      background:
-        rgba(0, 0, 0, 0.65);
+    .placeholder-text {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
 
-      border-radius: 6px;
+    .chat {
+      position: absolute;
+      z-index: 5;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      max-height: 43%;
+      display: flex;
+      flex-direction: column;
+      pointer-events: none;
+    }
 
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 7px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 12px 4px 10px;
+      scrollbar-width: thin;
+    }
+
+    .chat-message {
+      max-width: min(88%, 470px);
+      padding: 8px 12px;
+      border-radius: 13px;
+      background: rgba(7,10,22,.74);
+      border: 1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(12px);
       font-size: 14px;
+      line-height: 1.35;
+      pointer-events: none;
+    }
+
+    .chat-message .sender {
+      font-weight: 800;
+      margin-right: 7px;
+    }
+
+    .chat-message.you .sender {
+      color: #73d8ff;
+    }
+
+    .chat-message.stranger .sender {
+      color: #8e8aff;
+    }
+
+    .chat-form {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .chat-input {
+      width: 100%;
+      min-width: 0;
+      padding: 11px 15px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      outline: none;
+      background: rgba(5,8,19,.78);
+      color: white;
+      backdrop-filter: blur(14px);
+    }
+
+    .chat-input:focus {
+      border-color: rgba(119,113,255,.75);
+    }
+
+    .chat-send {
+      display: none;
     }
 
     .controls {
-      text-align: center;
-
-      padding: 10px 20px 20px;
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: -38px;
     }
 
-    button {
-      padding: 12px 20px;
-
-      margin: 5px;
-
-      border: none;
-
-      border-radius: 8px;
-
+    .control-button {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      padding: 12px 22px;
+      min-width: 116px;
+      color: white;
+      background: rgba(18,22,42,.94);
+      box-shadow: 0 10px 28px rgba(0,0,0,.30);
       cursor: pointer;
-
-      font-size: 16px;
+      font-weight: 800;
+      transition: transform .15s ease, filter .15s ease, opacity .15s ease;
     }
 
-    button:disabled {
-      opacity: 0.5;
+    .control-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
 
+    .control-button:disabled {
+      opacity: .45;
       cursor: not-allowed;
     }
 
+    #chatToggle {
+      border-color: rgba(104,99,255,.55);
+      background: rgba(83,77,220,.72);
+    }
+
+    #reportButton {
+      border-color: rgba(224,82,97,.34);
+      background: rgba(91,31,45,.82);
+      color: #ffb5bd;
+    }
+
+    #nextButton {
+      border: none;
+      background: linear-gradient(135deg, #6862ff, #756eff);
+      box-shadow: 0 10px 28px rgba(91,85,255,.35);
+    }
+
     #startButton {
-      background: white;
-      color: #111;
+      margin: 18px auto 0;
+      display: block;
+      border: none;
+      border-radius: 999px;
+      padding: 13px 26px;
+      color: white;
+      background: linear-gradient(135deg, #6862ff, #756eff);
+      cursor: pointer;
+      font-weight: 800;
+      box-shadow: 0 12px 30px rgba(91,85,255,.28);
     }
 
-    #status {
-      text-align: center;
-
-      padding: 10px 20px 30px;
-
-      color: #aaa;
-
-      min-height: 40px;
+    #startButton:disabled {
+      opacity: .5;
+      cursor: not-allowed;
     }
 
-    @media (max-width: 700px) {
-      .videos {
+    .chat-off .chat {
+      display: none;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(2,4,12,.72);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .report-modal {
+      width: min(440px, 100%);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px;
+      padding: 24px;
+      background: #151a2d;
+      box-shadow: var(--shadow);
+    }
+
+    .report-modal h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .report-modal p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .reason-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .reason-option {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 12px;
+      background: rgba(255,255,255,.025);
+      cursor: pointer;
+    }
+
+    .reason-option:hover {
+      background: rgba(255,255,255,.05);
+    }
+
+    .reason-option input {
+      accent-color: var(--purple);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .modal-button {
+      padding: 10px 17px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    #cancelReport {
+      background: rgba(255,255,255,.08);
+      color: white;
+    }
+
+    #submitReport {
+      background: var(--danger);
+      color: white;
+    }
+
+    #submitReport:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 800px) {
+      body {
+        padding: 12px;
+      }
+
+      .topbar {
+        margin-bottom: 10px;
+      }
+
+      .brand {
+        font-size: 18px;
+      }
+
+      .video-stage {
         grid-template-columns: 1fr;
+        min-height: 0;
+        border-radius: 18px;
+      }
+
+      .video-panel {
+        min-height: 43vh;
+      }
+
+      .video-panel + .video-panel {
+        border-left: 0;
+        border-top: 1px solid rgba(255,255,255,.13);
+      }
+
+      .controls {
+        margin-top: -30px;
+        gap: 6px;
+      }
+
+      .control-button {
+        min-width: 0;
+        padding: 10px 13px;
+        font-size: 13px;
+      }
+
+      .status-pill {
+        max-width: 58%;
+        font-size: 11px;
       }
     }
   </style>
 </head>
 
 <body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">Random Video Chat</div>
+      <div id="status" class="status-pill">Connecting to signaling server...</div>
+    </div>
 
-  <header>
+    <main>
+      <section class="video-stage">
+        <!-- STRANGER -->
+        <div class="video-panel">
+          <div class="video-label">Stranger</div>
 
-    <h1>WebRTC Video Test</h1>
+          <div id="remotePlaceholder" class="video-placeholder">
+            <svg class="placeholder-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <circle cx="32" cy="22" r="10" stroke="currentColor" stroke-width="5"/>
+              <path d="M14 52c2-10 9-16 18-16s16 6 18 16" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+            </svg>
+            <div class="placeholder-text">Stranger Video</div>
+          </div>
 
-    <p>
-      Open this page in two browser tabs.
-    </p>
-
-  </header>
-
-
-  <main>
-
-    <div class="videos">
-
-      <!-- YOUR VIDEO -->
-
-      <div class="video-container">
-
-        <video
-          id="localVideo"
-          autoplay
-          muted
-          playsinline
-        ></video>
-
-        <div class="label">
-          You
+          <video id="remoteVideo" autoplay playsinline></video>
         </div>
 
-      </div>
+        <!-- YOU -->
+        <div class="video-panel">
+          <div class="video-label">You</div>
 
+          <div id="localPlaceholder" class="video-placeholder">
+            <svg class="placeholder-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <circle cx="32" cy="22" r="10" stroke="currentColor" stroke-width="5"/>
+              <path d="M14 52c2-10 9-16 18-16s16 6 18 16" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+            </svg>
+            <div class="placeholder-text">Your Camera</div>
+          </div>
 
-      <!-- OTHER PERSON -->
+          <video id="localVideo" autoplay muted playsinline></video>
 
-      <div class="video-container">
+          <div id="chat" class="chat">
+            <div id="chatMessages" class="chat-messages"></div>
 
-        <video
-          id="remoteVideo"
-          autoplay
-          playsinline
-        ></video>
-
-        <div class="label">
-          Other person
+            <form id="chatForm" class="chat-form">
+              <input
+                id="chatInput"
+                class="chat-input"
+                type="text"
+                maxlength="500"
+                autocomplete="off"
+                placeholder="Type a message..."
+                disabled
+              >
+              <button class="chat-send" type="submit">Send</button>
+            </form>
+          </div>
         </div>
+      </section>
 
+      <div class="controls">
+        <button id="chatToggle" class="control-button" type="button">💬 Chat: ON</button>
+        <button id="reportButton" class="control-button" type="button" disabled>Report</button>
+        <button id="nextButton" class="control-button" type="button" disabled>Next</button>
       </div>
 
+      <button id="startButton" type="button">Start Camera</button>
+    </main>
+  </div>
+
+  <!-- REPORT MODAL -->
+  <div id="reportModal" class="modal-backdrop" aria-hidden="true">
+    <div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+      <h2 id="reportTitle">Report User</h2>
+      <p>Why are you reporting this person? Please choose a reason.</p>
+
+      <div class="reason-list">
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="nudity">
+          <span>Nudity / Sexual content</span>
+        </label>
+
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="harassment">
+          <span>Harassment / Bullying</span>
+        </label>
+
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="hate">
+          <span>Hate / Abusive behavior</span>
+        </label>
+
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="spam">
+          <span>Spam / Advertising</span>
+        </label>
+
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="underage">
+          <span>Underage user</span>
+        </label>
+
+        <label class="reason-option">
+          <input type="radio" name="reportReason" value="other">
+          <span>Other</span>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="cancelReport" class="modal-button" type="button">Cancel</button>
+        <button id="submitReport" class="modal-button" type="button" disabled>Submit Report</button>
+      </div>
     </div>
-
-
-    <div class="controls">
-
-      <button id="startButton">
-        Start Camera
-      </button>
-
-    </div>
-
-
-    <div id="status">
-      Connecting to signaling server...
-    </div>
-
-  </main>
-
+  </div>
 
   <script src="/app.js"></script>
-
 </body>
-
 </html>
