@@ -293,6 +293,39 @@ wss.on("connection", (socket, request) => {
 
 
     // ==============================================
+    // STOP VIDEO CHAT / DESTROY CURRENT MATCH
+    // ==============================================
+
+    if (message.type === "stop") {
+      console.log(
+        `[SERVER] Client ${socket.id} requested stop`
+      );
+
+      // Make sure this client is not left in the waiting queue.
+      removeFromWaiting(socket);
+
+      const oldPeer = socket.peer;
+
+      // The stopping client is no longer ready or matched.
+      socket.ready = false;
+      socket.peer = null;
+
+      // Tell the other browser that its stranger has left.
+      if (
+        oldPeer &&
+        oldPeer.readyState === WebSocket.OPEN
+      ) {
+        oldPeer.peer = null;
+
+        send(oldPeer, {
+          type: "peer-disconnected"
+        });
+      }
+
+      return;
+    }
+
+    // ==============================================
     // SKIP / FIND NEW PERSON
     // ==============================================
 
