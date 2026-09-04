@@ -37,6 +37,7 @@ const chatToggleButton = document.getElementById("chatToggleButton");
 const reportButton = document.getElementById("reportButton");
 
 const statusElement = document.getElementById("status");
+const onlineCountElement = document.getElementById("onlineCount");
 
 const chatForm = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
@@ -71,7 +72,7 @@ const rtcConfiguration = {
 
       
 
-         urls: 'turn:free.expressturn.com:3478',
+        urls: 'turn:free.expressturn.com:3478',
         username: "000000002103732653",
         credential: "rgTyOIK/8pVvQzdnm7e5jave1MA="
     }
@@ -213,6 +214,13 @@ function connectToSignalingServer() {
       const message = JSON.parse(event.data);
 
       debug("Received signaling message:", message.type);
+
+      if (message.type === "online-count") {
+        if (onlineCountElement) {
+          onlineCountElement.textContent = `● ${message.count} online`;
+        }
+        return;
+      }
 
       await handleSignalingMessage(message);
 
