@@ -7,6 +7,22 @@ const remoteVideo = document.getElementById("remoteVideo");
 const startButton = document.getElementById("startButton");
 const statusText = document.getElementById("status");
 
+const localPlaceholder = document.getElementById("localPlaceholder");
+const remotePlaceholder = document.getElementById("remotePlaceholder");
+
+const chat = document.getElementById("chat");
+const chatMessages = document.getElementById("chatMessages");
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
+const chatToggle = document.getElementById("chatToggle");
+
+const reportButton = document.getElementById("reportButton");
+const nextButton = document.getElementById("nextButton");
+
+const reportModal = document.getElementById("reportModal");
+const cancelReportButton = document.getElementById("cancelReport");
+const submitReportButton = document.getElementById("submitReport");
+
 // ==================================================
 // VARIABLES
 // ==================================================
@@ -19,23 +35,35 @@ let pendingIceCandidates = [];
 let hasStartedCamera = false;
 let isMatched = false;
 
+let chatChannel = null;
+let chatEnabled = true;
+
 // ==================================================
 // WEBRTC CONFIGURATION
 // ==================================================
 
 const rtcConfiguration = {
   iceServers: [
-    // STUN (helps discover public IP)
-    { 
-      urls: 'stun:free.expressturn.com:3478' 
-    },
-    // TURN (fallback for different networks)
     {
-      urls: 'turn:free.expressturn.com:3478',
-      username: "000000002103732653",
-      credential: "rgTyOIK/8pVvQzdnm7e5jave1MA="
+      urls: [
+        "stun:free.expressturn.com:3478"
+      ]
+    },
+    {
+      urls: [
+        "turn:free.expressturn.com:3478?transport=udp",
+        "turn:free.expressturn.com:3478?transport=tcp"
+      ],
+        urls: 'turn:free.expressturn.com:3478',
+        username: "000000002103732653",
+        credential: "rgTyOIK/8pVvQzdnm7e5jave1MA="
     }
   ],
+
+  // "all" lets WebRTC try direct/STUN paths first
+  // and use TURN when a relay is needed.
+  iceTransportPolicy: "all",
+
   iceCandidatePoolSize: 10
 };
 
@@ -45,6 +73,7 @@ const rtcConfiguration = {
 
 function debug(title, data = "") {
   const time = new Date().toLocaleTimeString();
+
   console.log(
     `%c[${time}] ${title}`,
     "font-weight: bold; color: #00ff88;",
@@ -66,14 +95,149 @@ function setStatus(message) {
 }
 
 // ==================================================
+// UI HELPERS
+// ==================================================
+
+function updateVideoPlaceholders() {
+  localPlaceholder.style.display = localVideo.srcObject ? "none" : "flex";
+  remotePlaceholder.style.display = remoteVideo.srcObject ? "none" : "flex";
+}
+
+function updateMatchButtons() {
+  reportButton.disabled = !isMatched;
+  nextButton.disabled = !isMatched;
+}
+
+function clearChat() {
+  chatMessages.innerHTML = "";
+}
+
+function addChatMessage(sender, text) {
+  const messageElement = document.createElement("div");
+
+  messageElement.className =
+    `chat-message ${sender === "You" ? "you" : "stranger"}`;
+
+  const senderElement = document.createElement("span");
+  senderElement.className = "sender";
+  senderElement.textContent = `${sender}:`;
+
+  const textElement = document.createElement("span");
+  textElement.textContent = text;
+
+  messageElement.appendChild(senderElement);
+  messageElement.appendChild(textElement);
+
+  chatMessages.appendChild(messageElement);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function updateChatUI() {
+  chat.style.display = chatEnabled ? "flex" : "none";
+  chatToggle.textContent = chatEnabled
+    ? "💬 Chat: ON"
+    : "💬 Chat: OFF";
+}
+
+function setChatInputEnabled(enabled) {
+  chatInput.disabled = !enabled;
+}
+
+function closeChatChannel() {
+  if (chatChannel) {
+    try {
+      chatChannel.close();
+    } catch (error) {
+      debugError("Failed to close chat channel", error);
+    }
+  }
+
+  chatChannel = null;
+  setChatInputEnabled(false);
+}
+
+// ==================================================
+// CHAT DATA CHANNEL
+// ==================================================
+
+function setupChatChannel(channel) {
+  closeChatChannel();
+
+  chatChannel = channel;
+
+  chatChannel.addEventListener("open", () => {
+    debug("Chat data channel opened.");
+    setChatInputEnabled(true);
+  });
+
+  chatChannel.addEventListener("message", (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === "chat" && typeof data.text === "string") {
+        addChatMessage("Stranger", data.text);
+      }
+    } catch (error) {
+      debugError("Could not process chat message", error);
+    }
+  });
+
+  chatChannel.addEventListener("close", () => {
+    debug("Chat data channel closed.");
+    setChatInputEnabled(false);
+  });
+
+  chatChannel.addEventListener("error", (error) => {
+    debugError("Chat data channel error", error);
+  });
+
+  if (chatChannel.readyState === "open") {
+    setChatInputEnabled(true);
+  }
+}
+
+// ==================================================
+// SEND CHAT MESSAGE
+// ==================================================
+
+function sendChatMessage(text) {
+  const cleanText = text.trim();
+
+  if (!cleanText || !chatChannel) {
+    return;
+  }
+
+  if (chatChannel.readyState !== "open") {
+    setStatus("Chat is not ready yet.");
+    return;
+  }
+
+  const message = {
+    type: "chat",
+    text: cleanText
+  };
+
+  try {
+    chatChannel.send(JSON.stringify(message));
+    addChatMessage("You", cleanText);
+  } catch (error) {
+    debugError("Failed to send chat message", error);
+  }
+}
+
+// ==================================================
 // SEND SIGNALING MESSAGE
 // ==================================================
 
 function sendMessage(message) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    debug("Cannot send signaling message. Socket is not open.", message);
+    debug(
+      "Cannot send signaling message. Socket is not open.",
+      message
+    );
     return;
   }
+
   debug("Sending signaling message", message.type);
   socket.send(JSON.stringify(message));
 }
@@ -83,10 +247,14 @@ function sendMessage(message) {
 // ==================================================
 
 function connectSignaling() {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const socketUrl = `${protocol}//${window.location.host}`;
+  const protocol =
+    window.location.protocol === "https:" ? "wss:" : "ws:";
+
+  const socketUrl =
+    `${protocol}//${window.location.host}`;
 
   debug("Connecting to signaling server", socketUrl);
+
   socket = new WebSocket(socketUrl);
 
   socket.addEventListener("open", () => {
@@ -97,21 +265,38 @@ function connectSignaling() {
   socket.addEventListener("message", async (event) => {
     try {
       const message = JSON.parse(event.data);
-      debug("Received signaling message", message.type);
+
+      debug(
+        "Received signaling message",
+        message.type
+      );
 
       switch (message.type) {
         case "waiting":
+          isMatched = false;
+          updateMatchButtons();
           setStatus("Waiting for another person...");
           break;
 
         case "matched":
           isMatched = true;
-          debug("Matched with another browser", message);
+          updateMatchButtons();
+
+          clearChat();
+
+          debug(
+            "Matched with another browser",
+            message
+          );
+
           setStatus("Partner found. Connecting...");
           break;
 
         case "create-offer":
-          debug("Server asked us to create an offer.");
+          debug(
+            "Server asked us to create an offer."
+          );
+
           await createOffer();
           break;
 
@@ -132,10 +317,17 @@ function connectSignaling() {
           break;
 
         default:
-          debug("Unknown signaling message", message);
+          debug(
+            "Unknown signaling message",
+            message
+          );
       }
+
     } catch (error) {
-      debugError("Error processing signaling message", error);
+      debugError(
+        "Error processing signaling message",
+        error
+      );
     }
   });
 
@@ -150,7 +342,10 @@ function connectSignaling() {
       reason: event.reason,
       wasClean: event.wasClean
     });
-    setStatus("Signaling server disconnected.");
+
+    setStatus(
+      "Signaling server disconnected."
+    );
   });
 }
 
@@ -165,24 +360,47 @@ async function startCamera() {
   }
 
   try {
-    debug("Requesting camera and microphone...");
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
+    debug(
+      "Requesting camera and microphone..."
+    );
 
-    debug("Camera and microphone obtained.");
+    localStream =
+      await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+
+    debug(
+      "Camera and microphone obtained."
+    );
+
     localVideo.srcObject = localStream;
+
     hasStartedCamera = true;
+
     startButton.disabled = true;
 
+    updateVideoPlaceholders();
+
     await createPeerConnection();
-    setStatus("Ready. Finding another person...");
-    sendMessage({ type: "ready" });
+
+    setStatus(
+      "Ready. Finding another person..."
+    );
+
+    sendMessage({
+      type: "ready"
+    });
 
   } catch (error) {
-    debugError("Camera/microphone error", error);
-    setStatus(`Could not access camera/microphone: ${error.name} - ${error.message}`);
+    debugError(
+      "Camera/microphone error",
+      error
+    );
+
+    setStatus(
+      `Could not access camera/microphone: ${error.name} - ${error.message}`
+    );
   }
 }
 
@@ -193,102 +411,244 @@ async function startCamera() {
 async function createPeerConnection() {
   if (peerConnection) {
     debug("Closing old PeerConnection");
-    peerConnection.close();
+
+    try {
+      peerConnection.close();
+    } catch (error) {
+      debugError(
+        "Failed to close old PeerConnection",
+        error
+      );
+    }
   }
+
+  closeChatChannel();
 
   pendingIceCandidates = [];
-  debug("Creating RTCPeerConnection", rtcConfiguration);
-  peerConnection = new RTCPeerConnection(rtcConfiguration);
+
+  debug(
+    "Creating RTCPeerConnection",
+    rtcConfiguration
+  );
+
+  peerConnection =
+    new RTCPeerConnection(
+      rtcConfiguration
+    );
 
   if (!localStream) {
-    throw new Error("No local camera/microphone stream exists.");
+    throw new Error(
+      "No local camera/microphone stream exists."
+    );
   }
 
-  localStream.getTracks().forEach((track) => {
-    debug("Adding local track", track.kind);
-    peerConnection.addTrack(track, localStream);
-  });
+  localStream
+    .getTracks()
+    .forEach((track) => {
+      debug(
+        "Adding local track",
+        track.kind
+      );
 
-  peerConnection.addEventListener("track", (event) => {
-    debug("REMOTE TRACK RECEIVED", {
-      kind: event.track.kind,
-      streams: event.streams.length
+      peerConnection.addTrack(
+        track,
+        localStream
+      );
     });
 
-    if (event.streams && event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-      debug("Remote stream attached to video");
-    }
-  });
+  // The callee receives the channel created by the caller.
+  peerConnection.addEventListener(
+    "datachannel",
+    (event) => {
+      debug(
+        "Remote data channel received",
+        event.channel.label
+      );
 
-  peerConnection.addEventListener("icecandidate", (event) => {
-    if (!event.candidate) {
-      debug("ICE gathering finished.");
-      return;
-    }
-    debug("Sending ICE candidate.", {
-      type: event.candidate.type,
-      protocol: event.candidate.protocol
-    });
-    sendMessage({
-      type: "ice-candidate",
-      candidate: event.candidate
-    });
-  });
-
-  peerConnection.addEventListener("icegatheringstatechange", () => {
-    debug("ICE gathering state:", peerConnection.iceGatheringState);
-  });
-
-  peerConnection.addEventListener("iceconnectionstatechange", () => {
-    const state = peerConnection.iceConnectionState;
-    debug("ICE state:", state);
-
-    if (state === "checking") {
-      setStatus("Connecting video...");
-    }
-    if (state === "connected" || state === "completed") {
-      setStatus("Video connected!");
-      logSelectedCandidatePair();
-    }
-    if (state === "disconnected") {
-      setStatus("Connection unstable, reconnecting...");
-      debug("ICE temporarily disconnected.");
-    }
-    if (state === "failed") {
-      setStatus("Video connection failed.");
-      debugError("ICE connection failed.");
-      try {
-        peerConnection.restartIce();
-      } catch (error) {
-        debugError("ICE restart failed", error);
+      if (event.channel.label === "chat") {
+        setupChatChannel(event.channel);
       }
     }
-    if (state === "closed") {
-      debug("ICE connection closed.");
+  );
+
+  peerConnection.addEventListener(
+    "track",
+    (event) => {
+      debug(
+        "REMOTE TRACK RECEIVED",
+        {
+          kind: event.track.kind,
+          streams: event.streams.length
+        }
+      );
+
+      if (
+        event.streams &&
+        event.streams[0]
+      ) {
+        remoteVideo.srcObject =
+          event.streams[0];
+
+        updateVideoPlaceholders();
+
+        debug(
+          "Remote stream attached to video"
+        );
+      }
     }
-  });
+  );
 
-  peerConnection.addEventListener("connectionstatechange", () => {
-    const state = peerConnection.connectionState;
-    debug("WebRTC connection state:", state);
+  peerConnection.addEventListener(
+    "icecandidate",
+    (event) => {
+      if (!event.candidate) {
+        debug(
+          "ICE gathering finished."
+        );
 
-    if (state === "connected") {
-      setStatus("Video connected!");
-      logSelectedCandidatePair();
+        return;
+      }
+
+      debug(
+        "Sending ICE candidate.",
+        {
+          type: event.candidate.type,
+          protocol: event.candidate.protocol
+        }
+      );
+
+      sendMessage({
+        type: "ice-candidate",
+        candidate: event.candidate
+      });
     }
-    if (state === "failed") {
-      setStatus("Video connection failed.");
+  );
+
+  peerConnection.addEventListener(
+    "icegatheringstatechange",
+    () => {
+      debug(
+        "ICE gathering state:",
+        peerConnection.iceGatheringState
+      );
     }
-  });
+  );
 
-  peerConnection.addEventListener("signalingstatechange", () => {
-    debug("Signaling state:", peerConnection.signalingState);
-  });
+  peerConnection.addEventListener(
+    "iceconnectionstatechange",
+    () => {
+      const state =
+        peerConnection.iceConnectionState;
 
-  peerConnection.addEventListener("negotiationneeded", () => {
-    debug("Negotiation needed.");
-  });
+      debug(
+        "ICE state:",
+        state
+      );
+
+      if (state === "checking") {
+        setStatus(
+          "Connecting video..."
+        );
+      }
+
+      if (
+        state === "connected" ||
+        state === "completed"
+      ) {
+        setStatus(
+          "Video connected!"
+        );
+
+        logSelectedCandidatePair();
+      }
+
+      if (state === "disconnected") {
+        setStatus(
+          "Connection unstable, reconnecting..."
+        );
+
+        debug(
+          "ICE temporarily disconnected."
+        );
+      }
+
+      if (state === "failed") {
+        setStatus(
+          "Video connection failed."
+        );
+
+        debugError(
+          "ICE connection failed."
+        );
+
+        try {
+          peerConnection.restartIce();
+        } catch (error) {
+          debugError(
+            "ICE restart failed",
+            error
+          );
+        }
+      }
+
+      if (state === "closed") {
+        debug(
+          "ICE connection closed."
+        );
+      }
+    }
+  );
+
+  peerConnection.addEventListener(
+    "connectionstatechange",
+    () => {
+      const state =
+        peerConnection.connectionState;
+
+      debug(
+        "WebRTC connection state:",
+        state
+      );
+
+      if (state === "connected") {
+        setStatus(
+          "Video connected!"
+        );
+
+        setChatInputEnabled(
+          chatChannel &&
+          chatChannel.readyState === "open"
+        );
+
+        logSelectedCandidatePair();
+      }
+
+      if (state === "failed") {
+        setStatus(
+          "Video connection failed."
+        );
+      }
+    }
+  );
+
+  peerConnection.addEventListener(
+    "signalingstatechange",
+    () => {
+      debug(
+        "Signaling state:",
+        peerConnection.signalingState
+      );
+    }
+  );
+
+  peerConnection.addEventListener(
+    "negotiationneeded",
+    () => {
+      debug(
+        "Negotiation needed."
+      );
+    }
+  );
 }
 
 // ==================================================
@@ -297,21 +657,57 @@ async function createPeerConnection() {
 
 async function createOffer() {
   if (!peerConnection) {
-    debugError("Cannot create offer. No PeerConnection.");
+    debugError(
+      "Cannot create offer. No PeerConnection."
+    );
+
     return;
   }
+
   try {
-    debug("Creating WebRTC offer...");
-    const offer = await peerConnection.createOffer();
-    debug("Setting local description...");
-    await peerConnection.setLocalDescription(offer);
-    debug("Sending offer...");
+    debug(
+      "Creating WebRTC offer..."
+    );
+
+    // Only the caller creates the chat data channel.
+    if (
+      !chatChannel ||
+      chatChannel.readyState === "closed"
+    ) {
+      const channel =
+        peerConnection.createDataChannel(
+          "chat"
+        );
+
+      setupChatChannel(channel);
+    }
+
+    const offer =
+      await peerConnection.createOffer();
+
+    debug(
+      "Setting local description..."
+    );
+
+    await peerConnection.setLocalDescription(
+      offer
+    );
+
+    debug(
+      "Sending offer..."
+    );
+
     sendMessage({
       type: "offer",
-      offer: peerConnection.localDescription
+      offer:
+        peerConnection.localDescription
     });
+
   } catch (error) {
-    debugError("Failed to create offer", error);
+    debugError(
+      "Failed to create offer",
+      error
+    );
   }
 }
 
@@ -321,24 +717,52 @@ async function createOffer() {
 
 async function handleOffer(message) {
   if (!peerConnection) {
-    debugError("Received offer but PeerConnection does not exist.");
+    debugError(
+      "Received offer but PeerConnection does not exist."
+    );
+
     return;
   }
+
   try {
-    debug("Received WebRTC offer.");
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
-    debug("Remote description set.");
+    debug(
+      "Received WebRTC offer."
+    );
+
+    await peerConnection.setRemoteDescription(
+      new RTCSessionDescription(
+        message.offer
+      )
+    );
+
+    debug(
+      "Remote description set."
+    );
+
     await processPendingIceCandidates();
-    
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    debug("Sending answer...");
+
+    const answer =
+      await peerConnection.createAnswer();
+
+    await peerConnection.setLocalDescription(
+      answer
+    );
+
+    debug(
+      "Sending answer..."
+    );
+
     sendMessage({
       type: "answer",
-      answer: peerConnection.localDescription
+      answer:
+        peerConnection.localDescription
     });
+
   } catch (error) {
-    debugError("Failed to handle offer", error);
+    debugError(
+      "Failed to handle offer",
+      error
+    );
   }
 }
 
@@ -348,16 +772,35 @@ async function handleOffer(message) {
 
 async function handleAnswer(message) {
   if (!peerConnection) {
-    debugError("Received answer but PeerConnection does not exist.");
+    debugError(
+      "Received answer but PeerConnection does not exist."
+    );
+
     return;
   }
+
   try {
-    debug("Received WebRTC answer.");
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
-    debug("Remote answer description set.");
+    debug(
+      "Received WebRTC answer."
+    );
+
+    await peerConnection.setRemoteDescription(
+      new RTCSessionDescription(
+        message.answer
+      )
+    );
+
+    debug(
+      "Remote answer description set."
+    );
+
     await processPendingIceCandidates();
+
   } catch (error) {
-    debugError("Failed to handle answer", error);
+    debugError(
+      "Failed to handle answer",
+      error
+    );
   }
 }
 
@@ -366,23 +809,53 @@ async function handleAnswer(message) {
 // ==================================================
 
 async function handleIceCandidate(message) {
-  if (!message.candidate) return;
-  
-  const candidateText = message.candidate.candidate || "";
-  debug("Received remote ICE candidate.", candidateText);
+  if (!message.candidate) {
+    return;
+  }
 
-  if (!peerConnection || !peerConnection.remoteDescription) {
-    debug("Remote description not ready.");
-    pendingIceCandidates.push(message.candidate);
-    debug("Saving ICE candidate for later.");
+  const candidateText =
+    message.candidate.candidate || "";
+
+  debug(
+    "Received remote ICE candidate.",
+    candidateText
+  );
+
+  if (
+    !peerConnection ||
+    !peerConnection.remoteDescription
+  ) {
+    debug(
+      "Remote description not ready."
+    );
+
+    pendingIceCandidates.push(
+      message.candidate
+    );
+
+    debug(
+      "Saving ICE candidate for later."
+    );
+
     return;
   }
 
   try {
-    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
-    debug("ICE candidate added.");
+    await peerConnection.addIceCandidate(
+      new RTCIceCandidate(
+        message.candidate
+      )
+    );
+
+    debug(
+      "ICE candidate added."
+    );
+
   } catch (error) {
-    debugError("Failed to add ICE candidate", error);
+    debugError(
+      "Failed to add ICE candidate",
+      error
+    );
   }
 }
 
@@ -391,20 +864,42 @@ async function handleIceCandidate(message) {
 // ==================================================
 
 async function processPendingIceCandidates() {
-  if (!peerConnection || !peerConnection.remoteDescription || pendingIceCandidates.length === 0) {
+  if (
+    !peerConnection ||
+    !peerConnection.remoteDescription ||
+    pendingIceCandidates.length === 0
+  ) {
     return;
   }
 
-  debug(`Processing ${pendingIceCandidates.length} saved ICE candidates.`);
-  const candidates = [...pendingIceCandidates];
+  debug(
+    `Processing ${pendingIceCandidates.length} saved ICE candidates.`
+  );
+
+  const candidates =
+    [...pendingIceCandidates];
+
   pendingIceCandidates = [];
 
-  for (const candidate of candidates) {
+  for (
+    const candidate of candidates
+  ) {
     try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-      debug("Saved ICE candidate added.");
+      await peerConnection.addIceCandidate(
+        new RTCIceCandidate(
+          candidate
+        )
+      );
+
+      debug(
+        "Saved ICE candidate added."
+      );
+
     } catch (error) {
-      debugError("Failed to add saved ICE candidate", error);
+      debugError(
+        "Failed to add saved ICE candidate",
+        error
+      );
     }
   }
 }
@@ -414,27 +909,165 @@ async function processPendingIceCandidates() {
 // ==================================================
 
 function handlePeerDisconnected() {
-  debug("Peer disconnected.");
+  debug(
+    "Peer disconnected."
+  );
+
   isMatched = false;
+
+  updateMatchButtons();
+
   pendingIceCandidates = [];
 
+  closeChatChannel();
+
   if (peerConnection) {
-    peerConnection.close();
+    try {
+      peerConnection.close();
+    } catch (error) {
+      debugError(
+        "Failed to close peer connection",
+        error
+      );
+    }
+
     peerConnection = null;
   }
 
   remoteVideo.srcObject = null;
 
+  updateVideoPlaceholders();
+
+  clearChat();
+
   if (localStream) {
     createPeerConnection()
       .then(() => {
-        setStatus("Partner disconnected. Finding someone new...");
-        sendMessage({ type: "ready" });
+        setStatus(
+          "Partner disconnected. Finding someone new..."
+        );
+
+        sendMessage({
+          type: "ready"
+        });
       })
       .catch((error) => {
-        debugError("Failed to recreate PeerConnection", error);
+        debugError(
+          "Failed to recreate PeerConnection",
+          error
+        );
       });
   }
+}
+
+// ==================================================
+// NEXT / SKIP
+// ==================================================
+
+async function nextPartner() {
+  if (!hasStartedCamera) {
+    return;
+  }
+
+  debug("Looking for next partner.");
+
+  isMatched = false;
+  updateMatchButtons();
+
+  closeChatChannel();
+
+  clearChat();
+
+  remoteVideo.srcObject = null;
+
+  updateVideoPlaceholders();
+
+  sendMessage({
+    type: "skip"
+  });
+
+  try {
+    await createPeerConnection();
+
+    setStatus(
+      "Finding someone new..."
+    );
+
+    sendMessage({
+      type: "ready"
+    });
+
+  } catch (error) {
+    debugError(
+      "Failed to prepare next connection",
+      error
+    );
+  }
+}
+
+// ==================================================
+// REPORT MODAL
+// ==================================================
+
+function openReportModal() {
+  if (!isMatched) {
+    return;
+  }
+
+  reportModal.classList.add("open");
+  reportModal.setAttribute(
+    "aria-hidden",
+    "false"
+  );
+
+  submitReportButton.disabled = true;
+
+  document
+    .querySelectorAll(
+      'input[name="reportReason"]'
+    )
+    .forEach((input) => {
+      input.checked = false;
+    });
+}
+
+function closeReportModal() {
+  reportModal.classList.remove("open");
+  reportModal.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+}
+
+function submitReport() {
+  const selected =
+    document.querySelector(
+      'input[name="reportReason"]:checked'
+    );
+
+  if (!selected) {
+    return;
+  }
+
+  const reason = selected.value;
+
+  debug(
+    "Report submitted",
+    reason
+  );
+
+  // Send the report through the signaling connection.
+  // The server can later store this in a database/moderation system.
+  sendMessage({
+    type: "report",
+    reason
+  });
+
+  closeReportModal();
+
+  setStatus(
+    "Report submitted. Thank you."
+  );
 }
 
 // ==================================================
@@ -442,42 +1075,158 @@ function handlePeerDisconnected() {
 // ==================================================
 
 async function logSelectedCandidatePair() {
-  if (!peerConnection) return;
+  if (!peerConnection) {
+    return;
+  }
 
   try {
-    const stats = await peerConnection.getStats();
+    const stats =
+      await peerConnection.getStats();
+
     let selectedPair = null;
 
     stats.forEach((report) => {
-      if (report.type === "candidate-pair" && (report.selected === true || report.nominated === true)) {
+      if (
+        report.type === "candidate-pair" &&
+        (
+          report.selected === true ||
+          report.nominated === true
+        )
+      ) {
         selectedPair = report;
       }
     });
 
     if (!selectedPair) {
-      debug("No selected ICE candidate pair found yet.");
+      debug(
+        "No selected ICE candidate pair found yet."
+      );
+
       return;
     }
 
-    const localCandidate = stats.get(selectedPair.localCandidateId);
-    const remoteCandidate = stats.get(selectedPair.remoteCandidateId);
+    const localCandidate =
+      stats.get(
+        selectedPair.localCandidateId
+      );
 
-    debug("SELECTED ICE CANDIDATE PAIR", {
-      localType: localCandidate?.candidateType,
-      remoteType: remoteCandidate?.candidateType,
-      localProtocol: localCandidate?.protocol,
-      remoteProtocol: remoteCandidate?.protocol,
-      state: selectedPair.state
-    });
+    const remoteCandidate =
+      stats.get(
+        selectedPair.remoteCandidateId
+      );
+
+    debug(
+      "SELECTED ICE CANDIDATE PAIR",
+      {
+        localType:
+          localCandidate?.candidateType,
+
+        remoteType:
+          remoteCandidate?.candidateType,
+
+        localProtocol:
+          localCandidate?.protocol,
+
+        remoteProtocol:
+          remoteCandidate?.protocol,
+
+        state:
+          selectedPair.state
+      }
+    );
 
   } catch (error) {
-    debugError("Could not inspect selected ICE candidate pair", error);
+    debugError(
+      "Could not inspect selected ICE candidate pair",
+      error
+    );
   }
 }
+
+// ==================================================
+// UI EVENTS
+// ==================================================
+
+startButton.addEventListener(
+  "click",
+  startCamera
+);
+
+chatForm.addEventListener(
+  "submit",
+  (event) => {
+    event.preventDefault();
+
+    const text =
+      chatInput.value.trim();
+
+    if (!text) {
+      return;
+    }
+
+    sendChatMessage(text);
+
+    chatInput.value = "";
+    chatInput.focus();
+  }
+);
+
+chatToggle.addEventListener(
+  "click",
+  () => {
+    chatEnabled = !chatEnabled;
+    updateChatUI();
+  }
+);
+
+nextButton.addEventListener(
+  "click",
+  nextPartner
+);
+
+reportButton.addEventListener(
+  "click",
+  openReportModal
+);
+
+cancelReportButton.addEventListener(
+  "click",
+  closeReportModal
+);
+
+submitReportButton.addEventListener(
+  "click",
+  submitReport
+);
+
+document
+  .querySelectorAll(
+    'input[name="reportReason"]'
+  )
+  .forEach((input) => {
+    input.addEventListener(
+      "change",
+      () => {
+        submitReportButton.disabled = false;
+      }
+    );
+  });
+
+reportModal.addEventListener(
+  "click",
+  (event) => {
+    if (event.target === reportModal) {
+      closeReportModal();
+    }
+  }
+);
 
 // ==================================================
 // INITIALIZATION
 // ==================================================
 
-startButton.addEventListener("click", startCamera);
+updateVideoPlaceholders();
+updateMatchButtons();
+updateChatUI();
+
 connectSignaling();
