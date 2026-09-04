@@ -1,444 +1,507 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Random Video Chat</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Hey</title>
 
   <style>
-    :root {
-      --bg: #090b18;
-      --panel: #11172a;
-      --panel-2: #171b3b;
-      --border: rgba(255,255,255,.12);
-      --text: #f5f7ff;
-      --muted: #9ba2bd;
-      --purple: #625cff;
-      --purple-2: #7a73ff;
-      --danger: #e05261;
-      --danger-dark: #4d1f2b;
-      --shadow: 0 24px 70px rgba(0,0,0,.42);
-    }
-
     * {
       box-sizing: border-box;
     }
 
-    html, body {
+    html,
+    body {
       margin: 0;
+      padding: 0;
+      width: 100%;
       min-height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
       background:
-        radial-gradient(circle at 20% 15%, rgba(79,70,229,.18), transparent 32%),
-        radial-gradient(circle at 85% 80%, rgba(37,99,235,.10), transparent 30%),
-        var(--bg);
-      color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
+        radial-gradient(circle at top left, #1d2147 0%, transparent 35%),
+        radial-gradient(circle at bottom right, #29154c 0%, transparent 35%),
+        #090b18;
+      color: white;
     }
 
     body {
       min-height: 100vh;
-      padding: 28px;
       overflow-x: hidden;
     }
 
-    button,
-    input {
-      font: inherit;
-    }
-
     .app {
-      width: min(1220px, 100%);
-      margin: 0 auto;
-    }
-
-    .topbar {
+      width: 100%;
+      min-height: 100vh;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+    }
+
+    /* ---------------- HEADER ---------------- */
+
+    .top-bar {
+      height: 68px;
+      display: flex;
       align-items: center;
-      gap: 16px;
-      margin-bottom: 18px;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: rgba(7, 9, 22, 0.82);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(14px);
+      position: relative;
+      z-index: 20;
     }
 
-    .brand {
-      font-size: 22px;
+    .logo {
+      font-size: 25px;
       font-weight: 800;
-      letter-spacing: -.03em;
+      letter-spacing: -0.5px;
     }
 
-    .status-pill {
-      max-width: 70%;
-      padding: 8px 14px;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: rgba(15,20,38,.72);
-      color: var(--muted);
+    .logo span {
+      color: #9d7cff;
+    }
+
+    .status {
       font-size: 13px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      color: #aeb3c7;
+      text-align: right;
     }
 
-    .video-stage {
-      position: relative;
+    /* ---------------- MAIN VIDEO AREA ---------------- */
+
+    .video-area {
+      flex: 1;
+      width: 100%;
+      padding: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .video-grid {
+      width: 100%;
+      max-width: 1500px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      min-height: min(72vh, 720px);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      overflow: hidden;
-      background: #0d1221;
-      box-shadow: var(--shadow);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
     }
 
-    .video-panel {
+    .video-card {
       position: relative;
-      min-width: 0;
-      min-height: 480px;
-      background:
-        radial-gradient(circle at 50% 48%, rgba(94,88,255,.16), transparent 27%),
-        linear-gradient(145deg, #19183f, #11172b 72%);
-    }
-
-    .video-panel + .video-panel {
-      border-left: 1px solid rgba(255,255,255,.13);
-      background:
-        radial-gradient(circle at 50% 48%, rgba(75,85,150,.11), transparent 27%),
-        linear-gradient(145deg, #11172b, #101727 72%);
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 300px;
+      background: #101323;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
     }
 
     video {
-      position: absolute;
-      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      background: transparent;
-    }
-
-    #localVideo {
-      transform: scaleX(-1);
+      display: block;
+      background: #111426;
     }
 
     .video-label {
       position: absolute;
-      z-index: 4;
-      top: 18px;
-      left: 18px;
-      padding: 7px 12px;
-      border-radius: 999px;
-      background: rgba(4,7,18,.72);
-      border: 1px solid rgba(255,255,255,.09);
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-transform: uppercase;
+      top: 14px;
+      left: 14px;
+      z-index: 5;
+
+      padding: 7px 11px;
+      border-radius: 9px;
+
+      background: rgba(5, 7, 18, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      font-size: 13px;
+      font-weight: 600;
+
+      backdrop-filter: blur(8px);
     }
 
     .video-placeholder {
       position: absolute;
       inset: 0;
-      z-index: 1;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       flex-direction: column;
-      gap: 14px;
-      color: rgba(255,255,255,.34);
+      gap: 8px;
+
+      color: #8f95ad;
+      background:
+        radial-gradient(circle at center, rgba(120, 91, 255, 0.12), transparent 45%),
+        #101323;
+
       pointer-events: none;
     }
 
     .placeholder-icon {
-      width: 58px;
-      height: 58px;
-      opacity: .65;
+      font-size: 40px;
+      opacity: 0.65;
     }
 
     .placeholder-text {
-      font-size: 19px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 14px;
     }
 
-    .chat {
+    /* ---------------- CHAT ---------------- */
+
+    .chat-panel {
       position: absolute;
-      z-index: 5;
       left: 18px;
       right: 18px;
       bottom: 18px;
-      max-height: 43%;
+
+      z-index: 8;
+
       display: flex;
       flex-direction: column;
+
       pointer-events: none;
     }
 
     .chat-messages {
+      max-height: 170px;
+      overflow-y: auto;
+
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
       gap: 7px;
-      max-height: 220px;
-      overflow-y: auto;
-      padding: 12px 4px 10px;
-      scrollbar-width: thin;
+
+      margin-bottom: 9px;
+      padding-right: 3px;
     }
 
     .chat-message {
-      max-width: min(88%, 470px);
-      padding: 8px 12px;
-      border-radius: 13px;
-      background: rgba(7,10,22,.74);
-      border: 1px solid rgba(255,255,255,.08);
-      backdrop-filter: blur(12px);
-      font-size: 14px;
+      width: fit-content;
+      max-width: 78%;
+
+      padding: 8px 11px;
+
+      border-radius: 12px;
+
+      font-size: 13px;
       line-height: 1.35;
-      pointer-events: none;
+
+      background: rgba(7, 9, 20, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+
+      backdrop-filter: blur(12px);
+
+      word-break: break-word;
     }
 
-    .chat-message .sender {
-      font-weight: 800;
-      margin-right: 7px;
+    .chat-message.mine {
+      align-self: flex-end;
+      background: rgba(111, 78, 220, 0.88);
     }
 
-    .chat-message.you .sender {
-      color: #73d8ff;
+    .chat-message.theirs {
+      align-self: flex-start;
     }
 
-    .chat-message.stranger .sender {
-      color: #8e8aff;
-    }
-
-    .chat-form {
+    .chat-input-row {
       display: flex;
       gap: 8px;
+
       pointer-events: auto;
     }
 
     .chat-input {
-      width: 100%;
+      flex: 1;
       min-width: 0;
-      padding: 11px 15px;
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 999px;
+
+      height: 40px;
+
+      padding: 0 13px;
+
+      border-radius: 11px;
+
+      border: 1px solid rgba(255, 255, 255, 0.1);
       outline: none;
-      background: rgba(5,8,19,.78);
+
+      background: rgba(7, 9, 20, 0.82);
       color: white;
-      backdrop-filter: blur(14px);
+
+      backdrop-filter: blur(12px);
     }
 
-    .chat-input:focus {
-      border-color: rgba(119,113,255,.75);
+    .chat-input::placeholder {
+      color: #858ba2;
     }
 
-    .chat-send {
-      display: none;
+    .send-button {
+      height: 40px;
+      padding: 0 14px;
+
+      border: 0;
+      border-radius: 11px;
+
+      background: #8b6cff;
+      color: white;
+
+      font-weight: 700;
+      cursor: pointer;
     }
+
+    .send-button:hover {
+      background: #9a7dff;
+    }
+
+    /* ---------------- CONTROLS ---------------- */
 
     .controls {
       position: relative;
       z-index: 10;
+
       display: flex;
       justify-content: center;
       align-items: center;
+
       gap: 12px;
-      margin-top: -38px;
+
+      /* Lower than before so it doesn't overlap the chat */
+      margin-top: 10px;
+
+      padding: 0 22px 22px;
     }
 
     .control-button {
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 999px;
-      padding: 12px 22px;
-      min-width: 116px;
+      min-width: 105px;
+      height: 44px;
+
+      padding: 0 16px;
+
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+
+      background: rgba(22, 25, 45, 0.95);
       color: white;
-      background: rgba(18,22,42,.94);
-      box-shadow: 0 10px 28px rgba(0,0,0,.30);
+
+      font-size: 14px;
+      font-weight: 700;
+
       cursor: pointer;
-      font-weight: 800;
-      transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+
+      transition:
+        transform 0.15s ease,
+        background 0.15s ease,
+        opacity 0.15s ease;
     }
 
     .control-button:hover:not(:disabled) {
       transform: translateY(-1px);
-      filter: brightness(1.08);
+      background: rgba(35, 39, 65, 1);
+    }
+
+    .control-button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .control-button.primary {
+      background: #7c5cff;
+      border-color: #7c5cff;
+    }
+
+    .control-button.primary:hover:not(:disabled) {
+      background: #8d70ff;
+    }
+
+    .control-button.stop {
+      background: rgba(175, 55, 72, 0.9);
+      border-color: rgba(255, 105, 125, 0.25);
+    }
+
+    .control-button.stop:hover:not(:disabled) {
+      background: rgba(198, 61, 80, 1);
+    }
+
+    .control-button.report {
+      background: rgba(80, 84, 108, 0.75);
     }
 
     .control-button:disabled {
-      opacity: .45;
+      opacity: 0.42;
       cursor: not-allowed;
+      transform: none;
     }
 
-    #chatToggle {
-      border-color: rgba(104,99,255,.55);
-      background: rgba(83,77,220,.72);
-    }
-
-    #reportButton {
-      border-color: rgba(224,82,97,.34);
-      background: rgba(91,31,45,.82);
-      color: #ffb5bd;
-    }
-
-    #nextButton {
-      border: none;
-      background: linear-gradient(135deg, #6862ff, #756eff);
-      box-shadow: 0 10px 28px rgba(91,85,255,.35);
-    }
-
-    #startButton {
-      margin: 18px auto 0;
-      display: block;
-      border: none;
-      border-radius: 999px;
-      padding: 13px 26px;
-      color: white;
-      background: linear-gradient(135deg, #6862ff, #756eff);
-      cursor: pointer;
-      font-weight: 800;
-      box-shadow: 0 12px 30px rgba(91,85,255,.28);
-    }
-
-    #startButton:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-    }
-
-    .chat-off .chat {
-      display: none;
-    }
+    /* ---------------- REPORT MODAL ---------------- */
 
     .modal-backdrop {
       position: fixed;
       inset: 0;
+
       z-index: 100;
+
       display: none;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+
       padding: 20px;
-      background: rgba(2,4,12,.72);
-      backdrop-filter: blur(8px);
+
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(7px);
     }
 
-    .modal-backdrop.open {
+    .modal-backdrop.show {
       display: flex;
     }
 
     .report-modal {
-      width: min(440px, 100%);
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 20px;
+      width: 100%;
+      max-width: 440px;
+
       padding: 24px;
-      background: #151a2d;
-      box-shadow: var(--shadow);
+
+      border-radius: 18px;
+
+      background: #15182b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
     }
 
     .report-modal h2 {
       margin: 0 0 8px;
-      font-size: 22px;
+      font-size: 21px;
     }
 
     .report-modal p {
       margin: 0 0 18px;
-      color: var(--muted);
+      color: #aeb3c7;
       font-size: 14px;
     }
 
-    .reason-list {
-      display: grid;
+    .report-options {
+      display: flex;
+      flex-direction: column;
       gap: 9px;
     }
 
-    .reason-option {
+    .report-option {
       display: flex;
       align-items: center;
-      gap: 11px;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.09);
-      border-radius: 12px;
-      background: rgba(255,255,255,.025);
+      gap: 10px;
+
+      padding: 11px 12px;
+
+      border-radius: 10px;
+
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+
       cursor: pointer;
+
+      font-size: 14px;
     }
 
-    .reason-option:hover {
-      background: rgba(255,255,255,.05);
+    .report-option:hover {
+      background: rgba(255, 255, 255, 0.06);
     }
 
-    .reason-option input {
-      accent-color: var(--purple);
+    .report-option input {
+      accent-color: #8b6cff;
     }
 
     .modal-actions {
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
+      gap: 9px;
+
       margin-top: 20px;
     }
 
     .modal-button {
-      padding: 10px 17px;
-      border: none;
+      height: 40px;
+
+      padding: 0 15px;
+
       border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+
+      color: white;
+      background: #252943;
+
       cursor: pointer;
-      font-weight: 800;
+
+      font-weight: 700;
     }
 
-    #cancelReport {
-      background: rgba(255,255,255,.08);
-      color: white;
+    .modal-button.submit {
+      background: #7c5cff;
+      border-color: #7c5cff;
     }
 
-    #submitReport {
-      background: var(--danger);
-      color: white;
-    }
+    /* ---------------- RESPONSIVE ---------------- */
 
-    #submitReport:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    @media (max-width: 800px) {
-      body {
-        padding: 12px;
+    @media (max-width: 850px) {
+      .top-bar {
+        height: 60px;
+        padding: 0 16px;
       }
 
-      .topbar {
-        margin-bottom: 10px;
+      .logo {
+        font-size: 22px;
       }
 
-      .brand {
-        font-size: 18px;
+      .video-area {
+        padding: 14px;
       }
 
-      .video-stage {
+      .video-grid {
         grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      .video-card {
         min-height: 0;
-        border-radius: 18px;
-      }
-
-      .video-panel {
-        min-height: 43vh;
-      }
-
-      .video-panel + .video-panel {
-        border-left: 0;
-        border-top: 1px solid rgba(255,255,255,.13);
       }
 
       .controls {
-        margin-top: -30px;
-        gap: 6px;
+        margin-top: 0;
+        padding: 0 14px 18px;
+
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
       .control-button {
         min-width: 0;
-        padding: 10px 13px;
-        font-size: 13px;
+        flex: 1;
+        height: 42px;
+        padding: 0 10px;
       }
 
-      .status-pill {
-        max-width: 58%;
+      .chat-panel {
+        left: 13px;
+        right: 13px;
+        bottom: 13px;
+      }
+    }
+
+    @media (max-width: 500px) {
+      .status {
         font-size: 11px;
+      }
+
+      .video-area {
+        padding: 10px;
+      }
+
+      .control-button {
+        font-size: 12px;
+      }
+
+      .chat-messages {
+        max-height: 130px;
       }
     }
   </style>
@@ -446,46 +509,80 @@
 
 <body>
   <div class="app">
-    <div class="topbar">
-      <div class="brand">Random Video Chat</div>
-      <div id="status" class="status-pill">Connecting to signaling server...</div>
-    </div>
 
-    <main>
-      <section class="video-stage">
+    <!-- HEADER -->
+    <header class="top-bar">
+      <div class="logo">
+        Hey<span>.</span>
+      </div>
+
+      <div id="status" class="status">
+        Click Start Camera to begin
+      </div>
+    </header>
+
+    <!-- VIDEOS -->
+    <main class="video-area">
+      <div class="video-grid">
+
         <!-- STRANGER -->
-        <div class="video-panel">
-          <div class="video-label">Stranger</div>
+        <section class="video-card">
+          <video
+            id="remoteVideo"
+            autoplay
+            playsinline
+          ></video>
 
-          <div id="remotePlaceholder" class="video-placeholder">
-            <svg class="placeholder-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-              <circle cx="32" cy="22" r="10" stroke="currentColor" stroke-width="5"/>
-              <path d="M14 52c2-10 9-16 18-16s16 6 18 16" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-            </svg>
-            <div class="placeholder-text">Stranger Video</div>
+          <div class="video-label">
+            Stranger
           </div>
 
-          <video id="remoteVideo" autoplay playsinline></video>
-        </div>
+          <div
+            id="remotePlaceholder"
+            class="video-placeholder"
+          >
+            <div class="placeholder-icon">👤</div>
+            <div class="placeholder-text">
+              Waiting for someone...
+            </div>
+          </div>
+        </section>
 
         <!-- YOU -->
-        <div class="video-panel">
-          <div class="video-label">You</div>
+        <section class="video-card">
+          <video
+            id="localVideo"
+            autoplay
+            muted
+            playsinline
+          ></video>
 
-          <div id="localPlaceholder" class="video-placeholder">
-            <svg class="placeholder-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-              <circle cx="32" cy="22" r="10" stroke="currentColor" stroke-width="5"/>
-              <path d="M14 52c2-10 9-16 18-16s16 6 18 16" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-            </svg>
-            <div class="placeholder-text">Your Camera</div>
+          <div class="video-label">
+            You
           </div>
 
-          <video id="localVideo" autoplay muted playsinline></video>
+          <div
+            id="localPlaceholder"
+            class="video-placeholder"
+          >
+            <div class="placeholder-icon">📷</div>
+            <div class="placeholder-text">
+              Your camera is off
+            </div>
+          </div>
 
-          <div id="chat" class="chat">
-            <div id="chatMessages" class="chat-messages"></div>
+          <!-- CHAT FLOATING OVER YOUR VIDEO -->
+          <div class="chat-panel">
 
-            <form id="chatForm" class="chat-form">
+            <div
+              id="chatMessages"
+              class="chat-messages"
+            ></div>
+
+            <form
+              id="chatForm"
+              class="chat-input-row"
+            >
               <input
                 id="chatInput"
                 class="chat-input"
@@ -493,66 +590,165 @@
                 maxlength="500"
                 autocomplete="off"
                 placeholder="Type a message..."
-                disabled
+              />
+
+              <button
+                id="sendChatButton"
+                class="send-button"
+                type="submit"
               >
-              <button class="chat-send" type="submit">Send</button>
+                Send
+              </button>
             </form>
+
           </div>
-        </div>
-      </section>
+        </section>
 
-      <div class="controls">
-        <button id="chatToggle" class="control-button" type="button">💬 Chat: ON</button>
-        <button id="reportButton" class="control-button" type="button" disabled>Report</button>
-        <button id="nextButton" class="control-button" type="button" disabled>Next</button>
       </div>
-
-      <button id="startButton" type="button">Start Camera</button>
     </main>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+
+      <button
+        id="startButton"
+        class="control-button primary"
+        type="button"
+      >
+        🎥 Start Camera
+      </button>
+
+      <button
+        id="chatToggleButton"
+        class="control-button"
+        type="button"
+        disabled
+      >
+        💬 Chat: ON
+      </button>
+
+      <button
+        id="reportButton"
+        class="control-button report"
+        type="button"
+        disabled
+      >
+        🚩 Report
+      </button>
+
+      <button
+        id="stopButton"
+        class="control-button stop"
+        type="button"
+        disabled
+      >
+        ⏹ Stop
+      </button>
+
+      <button
+        id="nextButton"
+        class="control-button"
+        type="button"
+        disabled
+      >
+        ⏭ Next
+      </button>
+
+    </div>
+
   </div>
 
   <!-- REPORT MODAL -->
-  <div id="reportModal" class="modal-backdrop" aria-hidden="true">
-    <div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
-      <h2 id="reportTitle">Report User</h2>
-      <p>Why are you reporting this person? Please choose a reason.</p>
+  <div
+    id="reportModalBackdrop"
+    class="modal-backdrop"
+  >
+    <div class="report-modal">
 
-      <div class="reason-list">
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="nudity">
+      <h2>Report this person</h2>
+
+      <p>
+        Please tell us why you are reporting this user.
+      </p>
+
+      <div class="report-options">
+
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Nudity / Sexual content"
+          />
           <span>Nudity / Sexual content</span>
         </label>
 
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="harassment">
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Harassment / Bullying"
+          />
           <span>Harassment / Bullying</span>
         </label>
 
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="hate">
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Hate / Abusive behavior"
+          />
           <span>Hate / Abusive behavior</span>
         </label>
 
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="spam">
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Spam / Advertising"
+          />
           <span>Spam / Advertising</span>
         </label>
 
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="underage">
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Underage user"
+          />
           <span>Underage user</span>
         </label>
 
-        <label class="reason-option">
-          <input type="radio" name="reportReason" value="other">
+        <label class="report-option">
+          <input
+            type="radio"
+            name="reportReason"
+            value="Other"
+          />
           <span>Other</span>
         </label>
+
       </div>
 
       <div class="modal-actions">
-        <button id="cancelReport" class="modal-button" type="button">Cancel</button>
-        <button id="submitReport" class="modal-button" type="button" disabled>Submit Report</button>
+
+        <button
+          id="cancelReportButton"
+          class="modal-button"
+          type="button"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="submitReportButton"
+          class="modal-button submit"
+          type="button"
+        >
+          Submit Report
+        </button>
+
       </div>
+
     </div>
   </div>
 
